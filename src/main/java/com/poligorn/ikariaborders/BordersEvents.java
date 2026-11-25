@@ -2,7 +2,9 @@ package com.poligorn.ikariaborders;
 
 import com.poligorn.ikariaborders.api.PlayerZoneChangeEvent.Cause;
 import com.poligorn.ikariaborders.command.BordersCommand;
+import com.poligorn.ikariaborders.enforce.HostileRemover;
 import com.poligorn.ikariaborders.opac.OpacBridge;
+import com.poligorn.ikariaborders.script.ScriptBridge;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -20,6 +22,7 @@ public final class BordersEvents {
 
     @SubscribeEvent
     public static void onServerStarting(ServerStartingEvent e) {
+        ScriptBridge.serverStarting(e.getServer());
         ZoneManager.loadAtStartup(e.getServer());
     }
 
@@ -27,11 +30,13 @@ public final class BordersEvents {
     public static void onServerStarted(ServerStartedEvent e) {
         OpacBridge.registerListener(e.getServer()); // one listener per run, reads the current config
         ClaimSweeper.onServerStarted(e.getServer());
+        ScriptBridge.serverStarted();
     }
 
     @SubscribeEvent
     public static void onServerStopped(ServerStoppedEvent e) {
         ClaimSweeper.onServerStopped();
+        ScriptBridge.serverStopped();
         OpacBridge.reset();
         PlayerZoneTracker.clear();
         ZoneManager.clear();
@@ -46,6 +51,7 @@ public final class BordersEvents {
     public static void onServerTick(ServerTickEvent.Post e) {
         PlayerZoneTracker.tick(e.getServer());
         ClaimSweeper.tick(e.getServer());
+        HostileRemover.tick(e.getServer());
     }
 
     @SubscribeEvent

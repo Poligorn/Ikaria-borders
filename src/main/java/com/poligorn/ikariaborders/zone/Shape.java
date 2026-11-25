@@ -13,6 +13,12 @@ public sealed interface Shape {
 
     boolean contains(double x, double z);
 
+    /**
+     * Signed distance to the border in blocks: positive inside, negative outside, 0 on the border (TZ §21.3).
+     * Exact for circle/square/rect/polygon (nearest edge); union = max, difference = min(base, -minus).
+     */
+    double signedDistance(double x, double z);
+
     /** Conservative bounding box (inclusive), used for fast rejection. */
     Bounds bounds();
 
@@ -39,6 +45,9 @@ public sealed interface Shape {
             double dx = x - cx, dz = z - cz;
             return dx * dx + dz * dz < radius * radius;
         }
+        @Override public double signedDistance(double x, double z) {
+            return radius - Math.hypot(x - cx, z - cz);
+        }
         @Override public Bounds bounds() {
             return new Bounds(cx - radius, cx + radius, cz - radius, cz + radius);
         }
@@ -50,6 +59,9 @@ public sealed interface Shape {
     record Square(double cx, double cz, double half) implements Shape {
         @Override public boolean contains(double x, double z) {
             return Math.max(Math.abs(x - cx), Math.abs(z - cz)) < half;
+        }
+        @Override public double signedDistance(double x, double z) {
+            return boxDistance(Math.abs(x - cx), Math.abs(z - cz), half, half);
         }
         @Override public Bounds bounds() {
             return new Bounds(cx - half, cx + half, cz - half, cz + half);
@@ -68,6 +80,11 @@ public sealed interface Shape {
         @Override public boolean contains(double x, double z) {
             int bx = (int) Math.floor(x), bz = (int) Math.floor(z);
             return bx >= minX && bx <= maxX && bz >= minZ && bz <= maxZ;
+        }
+        @Override public double signedDistance(double x, double z) {
+            // the rect covers whole blocks: real extent is [minX, maxX+1) x [minZ, maxZ+1)
+            double hx = (maxX + 1.0 - minX) / 2.0, hz = (maxZ + 1.0 - minZ) / 2.0;
+            return boxDistance(Math.abs(x - (minX + hx)), Math.abs(z - (minZ + hz)), hx, hz);
         }
         @Override public Bounds bounds() {
             return new Bounds(minX, maxX + 1.0, minZ, maxZ + 1.0);
@@ -101,6 +118,21 @@ public sealed interface Shape {
                 }
             }
             return inside;
+        }
+
+        @Override public double signedDistance(double x, double z) {
+            double best = Double.MAX_VALUE;
+            for (int i = 0, j = xs.length - 1; i < xs.length; j = i++) {
+                best = Math.min(best, segmentDistance(xs[j], zs[j], xs[i], zs[i], x, z));
+            }
+            return contains(x, z) ? best : -best;
+        }
+
+        private static double segmentDistance(double ax, double az, double bx, double bz, double px, double pz) {
+            double dx = bx - ax, dz = bz - az;
+            double len2 = dx * dx + dz * dz;
+            double t = len2 == 0 ? 0 : Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / len2));
+            return Math.hypot(px - (ax + t * dx), pz - (az + t * dz));
         }
 
         @Override public Bounds bounds() {
@@ -165,6 +197,11 @@ public sealed interface Shape {
             for (Shape s : shapes) if (s.contains(x, z)) return true;
             return false;
         }
+        @Override public double signedDistance(double x, double z) {
+            double best = -Double.MAX_VALUE;
+            for (Shape s : shapes) best = Math.max(best, s.signedDistance(x, z));
+            return best;
+        }
         @Override public Bounds bounds() {
             Bounds b = shapes.get(0).bounds();
             for (int i = 1; i < shapes.size(); i++) b = b.union(shapes.get(i).bounds());
@@ -184,12 +221,24 @@ public sealed interface Shape {
             for (Shape s : minus) if (s.contains(x, z)) return false;
             return true;
         }
+        @Override public double signedDistance(double x, double z) {
+            double d = base.signedDistance(x, z);
+            for (Shape s : minus) d = Math.min(d, -s.signedDistance(x, z));
+            return d;
+        }
         @Override public Bounds bounds() {
             return base.bounds();
         }
         @Override public String describe() {
             return "разность (" + base.describe() + " − " + minus.size() + ")";
         }
+    }
+
+    /** Signed distance to an axis-aligned box given |offset from centre| and half extents. */
+    private static double boxDistance(double adx, double adz, double hx, double hz) {
+        double ex = adx - hx, ez = adz - hz;
+        if (ex <= 0 && ez <= 0) return -Math.max(ex, ez);
+        return -Math.hypot(Math.max(ex, 0), Math.max(ez, 0));
     }
 
     private static String n(double v) {
