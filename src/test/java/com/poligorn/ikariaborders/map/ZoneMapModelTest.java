@@ -49,6 +49,11 @@ class ZoneMapModelTest {
         return m;
     }
 
+    /** Interior chunks of outline-only zones may be tooltip-highlit (colours all 0): nothing is drawn. */
+    static void assertNothingDrawn(int[] colors) {
+        if (colors != null) assertArrayEquals(new int[5], colors);
+    }
+
     // ---- chunk-centre membership at half=100 / half=1500 ----
 
     @Test
@@ -84,7 +89,7 @@ class ZoneMapModelTest {
         ZoneMapModel m = model(sq("spawn", 100, 30, "{\"show\":true,\"style\":\"outline\",\"color\":\"#55FF55\",\"opacity\":1}", false));
         int green = 0xFF55FF55;
         // interior chunk: nothing
-        assertNull(m.colors(WM, OW, 0, 0));
+        assertNothingDrawn(m.colors(WM, OW, 0, 0));
         // east edge chunk (cx=5): only east side coloured, centre transparent
         int[] e = m.colors(WM, OW, 5, 0);
         assertArrayEquals(new int[]{0, 0, green, 0, 0}, e);
@@ -103,7 +108,7 @@ class ZoneMapModelTest {
     void outerSideColoursTheNeighbourOutside() {
         ZoneMapModel m = model(sq("z", 100, 30, "{\"show\":true,\"style\":\"outline\",\"side\":\"outer\",\"color\":\"#FF0000\",\"opacity\":1}", false));
         int red = 0xFFFF0000;
-        assertNull(m.colors(WM, OW, 5, 0)); // inside chunk: not painted
+        assertNothingDrawn(m.colors(WM, OW, 5, 0)); // inside chunk: not painted
         // first chunk outside to the east: its WEST side faces the zone
         assertArrayEquals(new int[]{0, 0, 0, 0, red}, m.colors(WM, OW, 6, 0));
         assertArrayEquals(new int[]{0, 0, 0, red, 0}, m.colors(WM, OW, 0, -7)); // north outside: its south side faces the zone
@@ -122,7 +127,7 @@ class ZoneMapModelTest {
         assertArrayEquals(new int[]{blue, blue, blue, blue, blue}, fill.colors(WM, OW, 5, 0)); // fill only: border looks the same
 
         ZoneMapModel outline = model(sq("z", 100, 1, z.formatted("outline"), false));
-        assertNull(outline.colors(WM, OW, 0, 0));
+        assertNothingDrawn(outline.colors(WM, OW, 0, 0));
         assertArrayEquals(new int[]{0, 0, blue, 0, 0}, outline.colors(WM, OW, 5, 0));
 
         ZoneMapModel both = model(sq("z", 100, 1, z.formatted("fill+outline"), false));
@@ -140,9 +145,9 @@ class ZoneMapModelTest {
         // deep wild (inside the edge radius): wild fill, no build/spawn outline, and the edge zone does not hide the fill
         assertArrayEquals(new int[]{red, red, red, red, red}, m.colors(WM, OW, 5000 / 16, 0));
         // inside build, not on the border: no fill (not hatched inside)
-        assertNull(m.colors(WM, OW, 200 / 16, 0));
+        assertNothingDrawn(m.colors(WM, OW, 200 / 16, 0));
         // inside spawn: no fill
-        assertNull(m.colors(WM, OW, 0, 0));
+        assertNothingDrawn(m.colors(WM, OW, 0, 0));
         // spawn east border (half 100: last inside chunk cx=5): green outline only, no fill
         assertArrayEquals(new int[]{0, 0, green, 0, 0}, m.colors(WM, OW, 5, 0));
         // build east border (last inside chunk cx=93): blue outline only
@@ -248,7 +253,7 @@ class ZoneMapModelTest {
         m.setSettings(new MapSettings(true, true, true, 0.5, Set.of()));
         assertEquals((64 << 24) | 0xFFFFFF, m.colors(WM, OW, 0, 0)[C]); // round(0.25*255)=64
         m.setSettings(new MapSettings(true, true, true, 0.0, Set.of()));
-        assertNull(m.colors(WM, OW, 0, 0));
+        assertNothingDrawn(m.colors(WM, OW, 0, 0));
     }
 
     @Test
@@ -288,10 +293,10 @@ class ZoneMapModelTest {
     }
 
     @Test
-    void regionWithZoneInsideButNoOutlineOrFillHasNoHighlights() {
-        // build outline-only: region (0,0) is deep inside (no border chunk) -> false after the (cached) check
+    void regionDeepInsideOutlineZoneIsHighlitForTooltipOnly() {
+        // build outline-only: region (0,0) is deep inside: no border, but chunks carry the tooltip (highlit transparently)
         ZoneMapModel m = model(sq("build", 1500, 20, "{\"show\":true,\"style\":\"outline\"}", false));
-        assertFalse(m.regionHasHighlights(WM, OW, 0, 0));
+        assertTrue(m.regionHasHighlights(WM, OW, 0, 0));
         assertTrue(m.regionHasHighlights(WM, OW, 2, 0));   // x 1024..1535 contains the 1500 border
         assertTrue(m.regionHasHighlights(WM, OW, -3, 0));  // x -1536..-1025
     }
@@ -339,11 +344,51 @@ class ZoneMapModelTest {
     }
 
     @Test
-    void borderChunkTooltipComesFromTheBorderZone() throws IOException {
+    void tooltipComesFromContainingZoneAndBorderZone() throws IOException {
         ZoneMapModel m = exampleModel();
         assertEquals("Зона застройки", m.tooltip(WM, OW, 93, 0)); // build label, border chunk
-        assertNull(m.tooltip(WM, OW, 0, 0)); // spawn centre: outline-only, nothing to show
+        assertEquals("Спавн", m.tooltip(WM, OW, 0, 0)); // spawn centre: outline-only, tooltip over the whole area
         assertEquals("Спавн", m.tooltip(WM, OW, 5, 0)); // spawn border chunk
         assertEquals("Дикие земли — приват запрещён", m.tooltip(WM, OW, 624, 0)); // fill zone wins the tooltip over the edge line
+    }
+
+    @Test
+    void outlineOnlyZoneInteriorHasTooltipButDrawsNothing() throws IOException {
+        ZoneMapModel m = exampleModel();
+        int[] px = new int[256];
+        int[][] build = {{40, 40}, {-60, 20}, {0, 80}};
+        for (int[] c : build) {
+            assertEquals("Зона застройки", m.tooltip(WM, OW, c[0], c[1]));
+            assertEquals("Зона застройки", m.tooltip(MM, OW, c[0], c[1]));
+            assertTrue(m.chunkIsHighlit(WM, OW, c[0], c[1]));
+            assertFalse(m.raster(WM, OW, c[0], c[1], px));
+        }
+        assertEquals("Спавн", m.tooltip(WM, OW, 0, 0));
+        assertTrue(m.chunkIsHighlit(WM, OW, 0, 0));
+        assertFalse(m.raster(WM, OW, 0, 0, px));
+        assertArrayEquals(new int[5], m.colors(WM, OW, 40, 40));
+        // wild still filled
+        assertEquals("Дикие земли — приват запрещён", m.tooltip(WM, OW, 5000 / 16, 0));
+        java.util.Arrays.fill(px, 0);
+        assertTrue(m.raster(WM, OW, 5000 / 16, 0, px));
+        // edge line chunk: wild's tooltip, not edge's
+        assertEquals("Дикие земли — приват запрещён", m.tooltip(WM, OW, 624, 0));
+        assertTrue(m.regionHasHighlights(WM, OW, 0, 0));
+        assertTrue(m.regionHasHighlights(WM, OW, 1, 1));
+    }
+
+    @Test
+    void mapOnlyEdgeDoesNotLabelTheWholeWorld() {
+        ZoneMapModel m = model(
+                sq("edge", 10000, 100, "{\"show\":true,\"style\":\"outline\"}", true) + ","
+              + sq("build", 1500, 20, "{\"show\":true,\"style\":\"outline\"}", false));
+        int[] px = new int[256];
+        assertEquals("N-build", m.tooltip(WM, OW, 10, 10));
+        assertFalse(m.raster(WM, OW, 10, 10, px));
+        // outside build, inside edge, not on its line
+        assertNull(m.tooltip(WM, OW, 300, 300));
+        assertFalse(m.chunkIsHighlit(WM, OW, 300, 300));
+        // on the edge line: edge itself labels the border chunk
+        assertEquals("N-edge", m.tooltip(WM, OW, 624, 0));
     }
 }
