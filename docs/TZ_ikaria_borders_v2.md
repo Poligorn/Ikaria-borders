@@ -246,7 +246,7 @@ OPAC и OPAC Warfare свою защиту сохраняют. Действуе�
       "id": "wild", "name": "Дикие земли", "dimension": "minecraft:overworld",
       "default": true, "priority": 0,
       "rules": { "pvp": true, "claims": { "allow": false, "forceload": false, "anchor": false } },
-      "map": { "show": true, "color": "#E8A020", "style": "fill", "opacity": 0.3, "label": "Дикие земли — приват запрещён" },
+      "map": { "show": true, "color": "#FF3030", "style": "fill", "opacity": 0.3, "label": "Дикие земли — приват запрещён" },
       "meta": { "hud": "wild" }
     },
     {

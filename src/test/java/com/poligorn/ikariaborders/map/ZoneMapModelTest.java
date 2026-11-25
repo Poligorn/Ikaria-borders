@@ -133,12 +133,12 @@ class ZoneMapModelTest {
 
     @Test
     void exampleOnlyWildIsFilledSpawnAndBuildAreOutlines() throws IOException {
-        // wild = amber fill (hatched by the raster = claims forbidden); spawn green / build blue are outlines only
+        // wild = red fill (hatched by the raster = claims forbidden); spawn green / build blue are outlines only
         ZoneMapModel m = exampleModel();
-        int amber = ((int) Math.round(0.3 * 255) << 24) | 0xE8A020;
+        int red = ((int) Math.round(0.3 * 255) << 24) | 0xFF3030;
         int green = 0xFF000000 | 0x55FF55, blue = 0xFF000000 | 0x3399FF;
         // deep wild (inside the edge radius): wild fill, no build/spawn outline, and the edge zone does not hide the fill
-        assertArrayEquals(new int[]{amber, amber, amber, amber, amber}, m.colors(WM, OW, 5000 / 16, 0));
+        assertArrayEquals(new int[]{red, red, red, red, red}, m.colors(WM, OW, 5000 / 16, 0));
         // inside build, not on the border: no fill (not hatched inside)
         assertNull(m.colors(WM, OW, 200 / 16, 0));
         // inside spawn: no fill
@@ -148,7 +148,7 @@ class ZoneMapModelTest {
         // build east border (last inside chunk cx=93): blue outline only
         assertArrayEquals(new int[]{0, 0, blue, 0, 0}, m.colors(WM, OW, 93, 0));
         // first chunk outside build: wild fill again
-        assertArrayEquals(new int[]{amber, amber, amber, amber, amber}, m.colors(WM, OW, 94, 0));
+        assertArrayEquals(new int[]{red, red, red, red, red}, m.colors(WM, OW, 94, 0));
         // tooltips
         assertEquals("Дикие земли — приват запрещён", m.tooltip(WM, OW, 5000 / 16, 0));
         assertEquals("Зона застройки", m.tooltip(WM, OW, 93, 0));
@@ -160,15 +160,15 @@ class ZoneMapModelTest {
     void mapOnlyEdgeIsDrawnAndInnerOutlineStaysOnItsOwnBorder() throws IOException {
         ZoneMapModel m = exampleModel();
         int purple = ((int) Math.round(0.6 * 255) << 24) | 0xAA00FF;
-        int amber = ((int) Math.round(0.3 * 255) << 24) | 0xE8A020;
+        int red = ((int) Math.round(0.3 * 255) << 24) | 0xFF3030;
         // 10000 / 16 = 625: centre 624*16+8 = 9992 < 10000 inside, 625 -> 10008 outside
         int[] e = m.colors(WM, OW, 624, 0);
         assertNotNull(e, "mapOnly edge must be drawn");
-        assertArrayEquals(new int[]{amber, amber, purple, amber, amber}, e);
-        assertArrayEquals(new int[]{amber, amber, amber, amber, amber}, m.colors(WM, OW, 625, 0));
-        assertArrayEquals(new int[]{amber, amber, amber, amber, purple}, m.colors(WM, OW, -625, 0));
+        assertArrayEquals(new int[]{red, red, purple, red, red}, e);
+        assertArrayEquals(new int[]{red, red, red, red, red}, m.colors(WM, OW, 625, 0));
+        assertArrayEquals(new int[]{red, red, red, red, purple}, m.colors(WM, OW, -625, 0));
         // between 1500 and 10000 only the wild fill (no purple line at the build border)
-        assertArrayEquals(new int[]{amber, amber, amber, amber, amber}, m.colors(WM, OW, 100, 0));
+        assertArrayEquals(new int[]{red, red, red, red, red}, m.colors(WM, OW, 100, 0));
         // build border (blue) at 1500 sits on the build chunks only
         assertArrayEquals(new int[]{0, 0, 0xFF3399FF, 0, 0}, m.colors(WM, OW, 93, 0));
     }
