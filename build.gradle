@@ -115,12 +115,31 @@ configurations {
     runtimeClasspath.extendsFrom localRuntime
 }
 
+// OPAC jar location (see gradle.properties, property opac_jar). Fail the compile with a clear message if it is missing.
+def opacJar = file(findProperty('opac_jar') ?: "${rootDir}/../ikaria-zones/mod-libs/open-parties-and-claims-neoforge-1.21.1-0.32.7.jar")
+def opacCheck = tasks.register('checkOpacJar') {
+    def jar = opacJar
+    doLast {
+        if (!jar.isFile()) {
+            throw new GradleException("Не найден jar Open Parties and Claims: ${jar}\n" +
+                    "Он нужен только для компиляции (compileOnly, в репозиторий не входит). " +
+                    "Укажите путь: ./gradlew build -Popac_jar=/путь/open-parties-and-claims-neoforge-1.21.1-0.32.7.jar " +
+                    "(или свойство opac_jar в gradle.properties / ~/.gradle/gradle.properties).")
+        }
+    }
+}
+tasks.named('compileJava') { dependsOn opacCheck }
+
 dependencies {
     // Pure-JVM unit tests (no Minecraft bootstrap)
     testImplementation 'com.google.code.gson:gson:2.10.1'
     testImplementation platform('org.junit:junit-bom:5.11.4')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    // Open Parties and Claims 0.32.7: soft dependency, compileOnly, the jar is NOT in the repo and never distributed.
+    // Path: -Popac_jar=/path/to/open-parties-and-claims-neoforge-1.21.1-0.32.7.jar (or gradle.properties / ~/.gradle/gradle.properties).
+    compileOnly files(opacJar)
 
     // Sable is a soft dependency accessed via reflection (see SableCompat): no jar needed to build.
     // Example optional mod dependency with JEI

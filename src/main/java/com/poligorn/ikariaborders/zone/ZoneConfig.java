@@ -17,6 +17,8 @@ public final class ZoneConfig {
     public static final ZoneConfig EMPTY = new ZoneConfig(new JsonObject(), List.of());
 
     private final JsonObject globalRules;
+    private final GlobalSettings settings;
+    private final String claimSignature;
     private final List<Zone> zones;
     private final Map<String, Zone> byId;
     private final Map<String, List<Zone>> byDimension; // declaration order
@@ -25,7 +27,13 @@ public final class ZoneConfig {
 
     /** Zones must have unique ids and acyclic, existing parents (the loader guarantees this). */
     public ZoneConfig(JsonObject globalRules, List<Zone> zones) {
+        this(globalRules, zones, GlobalSettings.DEFAULT, "");
+    }
+
+    public ZoneConfig(JsonObject globalRules, List<Zone> zones, GlobalSettings settings, String claimSignature) {
         this.globalRules = globalRules;
+        this.settings = settings;
+        this.claimSignature = claimSignature;
         this.zones = List.copyOf(zones);
         Map<String, Zone> ids = new LinkedHashMap<>();
         Map<String, List<Zone>> dims = new LinkedHashMap<>();
@@ -112,6 +120,15 @@ public final class ZoneConfig {
 
     public Zone defaultZone(String dimension) {
         return defaults.get(dimension);
+    }
+
+    public GlobalSettings settings() {
+        return settings;
+    }
+
+    /** Fingerprint of everything that affects claim decisions (shapes, priorities, parents, claims.* rules). */
+    public String claimSignature() {
+        return claimSignature;
     }
 
     public JsonObject globalRules() {

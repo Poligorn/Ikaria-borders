@@ -5,6 +5,7 @@ import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.tree.LiteralCommandNode;
+import com.poligorn.ikariaborders.ClaimSweeper;
 import com.poligorn.ikariaborders.PlayerZoneTracker;
 import com.poligorn.ikariaborders.SableCompat;
 import com.poligorn.ikariaborders.ZoneManager;
@@ -54,6 +55,12 @@ public final class BordersCommand {
                                         ZoneManager.config().allZones().stream().map(Zone::id), b))
                                 .executes(c -> info(c.getSource(), StringArgumentType.getString(c, "id")))))
                 .then(Commands.literal("reload").requires(s -> s.hasPermission(2)).executes(c -> reload(c.getSource())))
+                .then(Commands.literal("claims").requires(s -> s.hasPermission(2))
+                        .then(Commands.literal("scan").executes(c -> claimsRun(c.getSource(), ClaimSweeper.Mode.SCAN)))
+                        .then(Commands.literal("sweep").executes(c -> claimsRun(c.getSource(), ClaimSweeper.Mode.MANUAL))))
+                .then(Commands.literal("legacy-cleanup").requires(s -> s.hasPermission(2))
+                        .executes(c -> legacy(c.getSource(), false))
+                        .then(Commands.literal("dryrun").executes(c -> legacy(c.getSource(), true))))
                 .then(Commands.literal("debug").requires(s -> s.hasPermission(2))
                         .then(Commands.literal("log")
                                 .then(Commands.literal("on").executes(c -> debugLog(c.getSource(), true)))
@@ -168,6 +175,32 @@ public final class BordersCommand {
         }
         reply(src, sb.toString());
         return 1;
+    }
+
+    // ---- claims ----
+
+    private static int claimsRun(CommandSourceStack src, ClaimSweeper.Mode mode) {
+        boolean started = ClaimSweeper.start(mode, asyncReply(src));
+        if (started) {
+            reply(src, mode == ClaimSweeper.Mode.SCAN
+                    ? "Проверка приватов запущена (ничего не снимается), отчёт придёт по окончании."
+                    : "Чистка приватов запущена по-настоящему (dryRun из конфига здесь не действует), отчёт придёт по окончании.");
+        }
+        return started ? 1 : 0;
+    }
+
+    private static int legacy(CommandSourceStack src, boolean dry) {
+        return ClaimSweeper.startLegacy(dry, asyncReply(src)) ? 1 : 0;
+    }
+
+    /** Replies later from the tick thread; failures are sent as failures. */
+    private static java.util.function.Consumer<String> asyncReply(CommandSourceStack src) {
+        return text -> {
+            boolean failure = text.startsWith("Open Parties") || text.startsWith("Уже идёт") || text.startsWith("Сервер ещё")
+                    || text.startsWith("Чистка прервана");
+            if (failure) src.sendFailure(Component.literal(text));
+            else reply(src, text);
+        };
     }
 
     // ---- debug ----

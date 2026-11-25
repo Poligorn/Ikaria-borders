@@ -113,6 +113,16 @@ public final class Zone {
         return ruleBool("claims.allow", true);
     }
 
+    /** Forceload needs a claim: false if {@code claims.allow} or {@code claims.forceload} is false. */
+    public boolean forceloadAllowed() {
+        return claimsAllowed() && ruleBool("claims.forceload", true);
+    }
+
+    /** Anchoring needs a claim: false if {@code claims.allow} or {@code claims.anchor} is false. */
+    public boolean anchorAllowed() {
+        return claimsAllowed() && ruleBool("claims.anchor", true);
+    }
+
     @Override public String toString() {
         return "Zone[" + id + "]";
     }

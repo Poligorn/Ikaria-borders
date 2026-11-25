@@ -67,10 +67,12 @@ public final class ConfigLoader {
         else if (ver.getAsInt() != SUPPORTED_VERSION) err("version", "поддерживается только версия " + SUPPORTED_VERSION + ", найдено " + ver.getAsInt());
 
         JsonObject globalRules = new JsonObject();
+        GlobalSettings settings = GlobalSettings.DEFAULT;
         JsonElement g = root.get("global");
         if (g != null) {
             if (!g.isJsonObject()) err("global", "должно быть объектом");
             else {
+                settings = globalSettings(g.getAsJsonObject());
                 JsonElement gr = g.getAsJsonObject().get("rules");
                 if (gr != null) {
                     if (!gr.isJsonObject()) err("global.rules", "должно быть объектом");
@@ -141,7 +143,63 @@ public final class ConfigLoader {
                     : z);
         }
         tieWarnings(finalZones, zoneIdx);
-        return new ZoneConfig(globalRules, finalZones);
+        return new ZoneConfig(globalRules, finalZones, settings, claimSignature(globalRules, arr));
+    }
+
+    /** Parses global.messages / global.exempt / global.sweep (TZ §8.2). Unknown keys are ignored. */
+    private GlobalSettings globalSettings(JsonObject g) {
+        String msg = GlobalSettings.DEFAULT_CLAIM_DENIED;
+        boolean exemptServer = true;
+        GlobalSettings.Sweep sw = GlobalSettings.Sweep.DEFAULT;
+
+        JsonElement m = g.get("messages");
+        if (m != null) {
+            if (!m.isJsonObject()) err("global.messages", "должно быть объектом");
+            else {
+                String s = str(m.getAsJsonObject(), "claimDenied", "global.messages", false);
+                if (s != null) msg = s;
+            }
+        }
+        JsonElement ex = g.get("exempt");
+        if (ex != null) {
+            if (!ex.isJsonObject()) err("global.exempt", "должно быть объектом");
+            else exemptServer = bool(ex.getAsJsonObject(), "serverClaims", "global.exempt", true);
+        }
+        JsonElement s = g.get("sweep");
+        if (s != null) {
+            if (!s.isJsonObject()) err("global.sweep", "должно быть объектом");
+            else {
+                JsonObject o = s.getAsJsonObject();
+                boolean onStart = bool(o, "onStart", "global.sweep", sw.onStart());
+                boolean dry = bool(o, "dryRun", "global.sweep", sw.dryRun());
+                Integer interval = integer(o, "intervalMinutes", "global.sweep");
+                Integer perTick = integer(o, "perTick", "global.sweep");
+                if (interval != null && interval < 0) err("global.sweep.intervalMinutes", "должно быть >= 0 (0 — без периодической чистки)");
+                if (perTick != null && perTick < 1) err("global.sweep.perTick", "должно быть >= 1");
+                sw = new GlobalSettings.Sweep(onStart, interval == null ? sw.intervalMinutes() : interval,
+                        perTick == null ? sw.perTick() : perTick, dry);
+            }
+        }
+        return new GlobalSettings(msg, exemptServer, sw);
+    }
+
+    /** Stable text of everything that affects claim decisions; used to decide on a sweep after reload. */
+    private static String claimSignature(JsonObject globalRules, JsonArray zones) {
+        StringBuilder sb = new StringBuilder();
+        JsonElement gc = globalRules.get("claims");
+        sb.append("g=").append(gc == null ? "" : gc).append('\n');
+        for (JsonElement e : zones) {
+            if (!e.isJsonObject()) continue;
+            JsonObject o = e.getAsJsonObject();
+            for (String k : new String[]{"id", "dimension", "default", "priority", "parent", "mapOnly", "shape"}) {
+                sb.append(k).append('=').append(o.get(k)).append(';');
+            }
+            JsonElement r = o.get("rules");
+            if (r != null && r.isJsonObject()) sb.append("claims=").append(r.getAsJsonObject().get("claims"));
+            else sb.append("rules=").append(r);
+            sb.append('\n');
+        }
+        return sb.toString();
     }
 
     private void tieWarnings(List<Zone> zones, Map<String, Integer> zoneIdx) {

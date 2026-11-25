@@ -6,7 +6,7 @@
 ## Жёсткие правила
 
 - Никогда не мержить, не ставить теги и не публиковать релиз без явного OK от Egor (Poligorn).
-- Работа только в ветке + PR. Сейчас рабочая ветка: `feat/0.1-core`, база: `docs/tz`.
+- Работа только в ветке + PR. Сейчас рабочая ветка: `feat/0.2-core`, база: `docs/tz` (0.1 влит в `docs/tz`).
 - Не печатать ключи, токены и секреты.
 - Быть честным, что не проверено в игре.
 
@@ -25,9 +25,21 @@
 - Целевая версия NeoForge: **21.1.250** (тестовый сервер) или совместимая 21.1.252; диапазон `[21.1.219,)`.
 - Parchment: 1.21.1 / 2024.11.17.
 - Жёстких зависимостей кроме NeoForge нет.
-- Мягкие (compileOnly / optional, код устойчив к их отсутствию): Sable 2.0.6, позже OPAC / Xaero / KubeJS — не для этапа 0.1, кроме Sable-проекции.
+- Мягкие (compileOnly / optional, код устойчив к их отсутствию): Sable 2.0.6 (reflection), Open Parties and Claims 0.32.7 (mod id `openpartiesandclaims`, `compileOnly files(opac_jar)`, в mods.toml `optional`; jar в репозиторий **не** кладём, путь — свойство gradle `opac_jar`, по умолчанию `../ikaria-zones/mod-libs/…`). Позже Xaero / KubeJS.
 
-## Этап 0.1 (текущий объём — не выходить за него)
+## Этап 0.2 (реализован в `feat/0.2-core`, в ревью; текущий объём — не выходить за него)
+
+По ТЗ §7, §14, §18 (тесты 1–5):
+
+- Один слушатель OPAC (`IClaimActionListenerAPI`) на `ServerStartedEvent`; читает **текущий** конфиг, перерегистрация при reload не нужна. Зона центра чанка → `claims.allow|forceload|anchor`; UNCLAIM/UNFORCELOAD/UNANCHOR/UNCLAIM_UNANCHORED — всегда можно. Отказ: `FORBID` + `global.messages.claimDenied` (`{zone}`, `{id}`, `{dim}`, `{cx}`, `{cz}`, `{action}`) и `ZoneClaimDeniedEvent`. Actionbar мод **не пишет** (только hud_manager).
+- Исключения: **только** серверные приваты (`SpecialClaimOwners.SERVER`, UUID 0-0). Ни операторов, ни списков UUID. `isClaimAllowed` учитывает `claims.allow` и это исключение.
+- Чистка (`SweepJob`/`ClaimSweeper`): через 30 с после старта, после `/borders reload` при изменении claim-релевантных зон/правил, вручную, периодически (`global.sweep.intervalMinutes`, 60). Порции `perTick` (200) на главном потоке, бюджет ≤ 2 мс/тик. `dryRun` из конфига действует на автоматические чистки; ручной `claims sweep` снимает по-настоящему. Лог `[ikaria_borders/claims] снято N у <ник> (<uuid>)`, `ZoneClaimsSweptEvent`, системное сообщение владельцу онлайн, если нет KubeJS.
+- Команды (уровень 2): `/borders claims scan|sweep`, `/borders legacy-cleanup [dryrun]` (серверные приваты в подконфигах `ikaria-spawn|500|wild|edge`; сами подконфиги через API не удалить — пустые могут остаться).
+- Без OPAC мод грузится: нет запрета и чистки, команды сообщают, что OPAC отсутствует. Типы OPAC используются только в пакете `opac` (`OpacApi`), доступ через `OpacBridge`.
+- Чистая логика (`claims.ClaimPolicy`, `SweepJob`, `LegacyCleanupJob`) не зависит от OPAC и Minecraft и покрыта тестами без игры.
+- Не проверено в игре: поведение слушателя и чистки на живом OPAC, снятие форслоада через повторный `claim(..., false)`, сопоставление имён подконфигов, поведение при `/opac server-claims`.
+
+## Этап 0.1 (реализован, влит в `docs/tz`)
 
 По ТЗ §18:
 
@@ -42,9 +54,8 @@
 - Пример конфига из §8.2 (`zones.json` / `zones.example.json`).
 - Сборка: `./gradlew build` и тесты зелёные.
 
-## Не входит в 0.1
+## Не входит в 0.2 (0.3+)
 
-- Запрет приватов OPAC, sweep/scan, `legacy-cleanup`, `ZoneClaimDeniedEvent`, `ZoneClaimsSweptEvent`.
 - Принудительное применение PvP/урона/взрывов/спавна (поля правил в модели и в выводе команд — да; обработчики событий — нет).
 - Клиентская синхронизация и отрисовка Xaero (пакет sync можно не делать; reload клиентам не рассылать).
 - Плагин KubeJS, динамические зоны, override, `/borders scripts`, `/borders resync`, концепт захвата (CONCEPT.md §7).

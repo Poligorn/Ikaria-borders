@@ -3,6 +3,7 @@ package com.poligorn.ikariaborders.api;
 import com.poligorn.ikariaborders.PlayerZoneTracker;
 import com.poligorn.ikariaborders.SableCompat;
 import com.poligorn.ikariaborders.ZoneManager;
+import com.poligorn.ikariaborders.claims.ClaimPolicy;
 import com.poligorn.ikariaborders.zone.Zone;
 import com.poligorn.ikariaborders.zone.ZoneConfig;
 import net.minecraft.resources.ResourceKey;
@@ -57,11 +58,12 @@ public final class IkariaBordersAPI {
     }
 
     /**
-     * Whether claiming is allowed in the chunk per config rules ({@code claims.allow}).
-     * 0.1: config rules only; {@code owner} is reserved for exemptions (0.2) and no OPAC is consulted.
+     * Whether claiming is allowed in the chunk per config rules ({@code claims.allow}, chunk-centre zone).
+     * Server claims are exempt: pass OPAC's {@code SpecialClaimOwners.SERVER} (UUID 0-0, also
+     * {@link com.poligorn.ikariaborders.claims.ClaimPolicy#SERVER_OWNER}). No operator exemptions. OPAC is not consulted.
      */
     public static boolean isClaimAllowed(String dimension, int cx, int cz, UUID owner) {
-        return ZoneManager.config().zoneOfChunk(dimension, cx, cz).claimsAllowed();
+        return ClaimPolicy.isClaimAllowed(ZoneManager.config(), dimension, cx, cz, owner);
     }
 
     public static boolean isClaimAllowed(ResourceKey<Level> dimension, int cx, int cz, UUID owner) {
