@@ -2,6 +2,8 @@ package com.poligorn.ikariaborders;
 
 import com.mojang.logging.LogUtils;
 import com.poligorn.ikariaborders.api.ZonesReloadedEvent;
+import com.poligorn.ikariaborders.script.FlagRegistry;
+import com.poligorn.ikariaborders.script.ScriptBridge;
 import com.poligorn.ikariaborders.zone.ConfigIssue;
 import com.poligorn.ikariaborders.zone.ConfigLoader;
 import com.poligorn.ikariaborders.zone.ZoneConfig;
@@ -79,7 +81,8 @@ public final class ZoneManager {
             LOG.error("[ikaria_borders] {}", issue);
             return new ReloadResult(false, 0, List.of(issue), List.of());
         }
-        ConfigLoader.Result res = ConfigLoader.parse(json, dimensionPredicate(server));
+        ConfigLoader.Result res = ConfigLoader.parse(json, dimensionPredicate(server),
+                announce && ScriptBridge.active() ? FlagRegistry::isKnown : null); // flags are registered by scripts after start
         for (ConfigIssue w : res.warnings()) LOG.warn("[ikaria_borders] предупреждение: {}", w);
         if (!res.ok()) {
             for (ConfigIssue e : res.errors()) LOG.error("[ikaria_borders] ошибка конфига: {}", e);
@@ -90,6 +93,7 @@ public final class ZoneManager {
         int n = res.config().allZones().size();
         LOG.info("[ikaria_borders] Конфиг загружен: {} зон(ы)", n);
         PlayerZoneTracker.invalidateAll();
+        ScriptBridge.configLoaded(announce);
         NeoForge.EVENT_BUS.post(new ZonesReloadedEvent(n));
         if (announce) ClaimSweeper.onReload(before, current); // sweep only on /borders reload, not at startup
         return new ReloadResult(true, n, List.of(), res.warnings());

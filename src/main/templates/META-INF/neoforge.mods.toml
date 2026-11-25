@@ -33,3 +33,10 @@ description='''
     type="optional"
     ordering="AFTER"
     side="BOTH"
+
+# Optional: without KubeJS there are no script events or the IkariaBorders binding; zone rules work as usual.
+[[dependencies.${mod_id}]]
+    modId="kubejs"
+    type="optional"
+    ordering="AFTER"
+    side="BOTH"

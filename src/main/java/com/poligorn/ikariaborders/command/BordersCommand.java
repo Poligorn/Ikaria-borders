@@ -9,6 +9,7 @@ import com.poligorn.ikariaborders.ClaimSweeper;
 import com.poligorn.ikariaborders.PlayerZoneTracker;
 import com.poligorn.ikariaborders.SableCompat;
 import com.poligorn.ikariaborders.ZoneManager;
+import com.poligorn.ikariaborders.script.ScriptBridge;
 import com.poligorn.ikariaborders.zone.ConfigIssue;
 import com.poligorn.ikariaborders.zone.Zone;
 import com.poligorn.ikariaborders.zone.ZoneConfig;
@@ -58,6 +59,7 @@ public final class BordersCommand {
                 .then(Commands.literal("claims").requires(s -> s.hasPermission(2))
                         .then(Commands.literal("scan").executes(c -> claimsRun(c.getSource(), ClaimSweeper.Mode.SCAN)))
                         .then(Commands.literal("sweep").executes(c -> claimsRun(c.getSource(), ClaimSweeper.Mode.MANUAL))))
+                .then(Commands.literal("scripts").requires(s -> s.hasPermission(2)).executes(c -> scripts(c.getSource())))
                 .then(Commands.literal("legacy-cleanup").requires(s -> s.hasPermission(2))
                         .executes(c -> legacy(c.getSource(), false))
                         .then(Commands.literal("dryrun").executes(c -> legacy(c.getSource(), true))))
@@ -203,11 +205,18 @@ public final class BordersCommand {
         };
     }
 
+    // ---- scripts ----
+
+    private static int scripts(CommandSourceStack src) {
+        reply(src, String.join("\n", ScriptBridge.report()));
+        return 1;
+    }
+
     // ---- debug ----
 
     private static int debugLog(CommandSourceStack src, boolean on) {
         PlayerZoneTracker.setDebugLog(on);
-        reply(src, "Журнал смен зон: " + (on ? "включён (с ограничением частоты)" : "выключен"));
+        reply(src, "Журнал смен зон, отмен PvP/урона/взрывов/спавна: " + (on ? "включён (с ограничением частоты)" : "выключен"));
         return 1;
     }
 

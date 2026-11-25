@@ -9,6 +9,7 @@ import com.poligorn.ikariaborders.claims.ClaimEntry;
 import com.poligorn.ikariaborders.claims.ClaimPolicy;
 import com.poligorn.ikariaborders.claims.ClaimRemover;
 import com.poligorn.ikariaborders.claims.ClaimSource;
+import com.poligorn.ikariaborders.script.ScriptBridge;
 import com.poligorn.ikariaborders.zone.ZoneConfig;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -75,9 +76,16 @@ final class OpacApi {
                 ZoneConfig cfg = ZoneManager.config(); // always the current config
                 String dimId = dim.toString();
                 ClaimPolicy.Verdict v = ClaimPolicy.check(cfg, dimId, cx, cz, type, owner);
-                if (v.allowed()) return current;
-                String msg = ClaimPolicy.formatMessage(cfg.settings().claimDeniedMessage(), v.zone(), dimId, cx, cz, type);
                 ServerPlayer online = server == null ? null : server.getPlayerList().getPlayer(owner);
+                String msg;
+                if (v.allowed()) {
+                    // scripts run after the built-in rules and can only tighten; server claims stay exempt
+                    if (!ScriptBridge.active() || ClaimPolicy.isExempt(cfg, owner) || server == null || !server.isSameThread()) return current;
+                    msg = ScriptBridge.onClaimAttempt(owner, online, type, new ChunkPos(cx, cz), v.zone());
+                    if (msg == null) return current;
+                } else {
+                    msg = ClaimPolicy.formatMessage(cfg.settings().claimDeniedMessage(), v.zone(), dimId, cx, cz, type);
+                }
                 if (PlayerZoneTracker.debugLog()) {
                     LOG.info("[ikaria_borders/claims] отказ {} {} в {} чанк ({}, {}) зона {}", owner, type, dimId, cx, cz, v.zone().id());
                 }

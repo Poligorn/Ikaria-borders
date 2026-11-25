@@ -34,6 +34,8 @@ public final class PlayerZoneTracker {
         long lastLogMillis;
 
         public ZoneView zone() { return zone; }
+        /** Last Sable-projected position (equal to the real one without Sable); null before the first check. */
+        public SableCompat.Projection projection() { return projection; }
         public String dimension() { return dimension; }
         public long lastChangeMillis() { return lastChangeMillis; }
     }
@@ -47,6 +49,16 @@ public final class PlayerZoneTracker {
     public static void setDebugLog(boolean on) { debugLog = on; }
 
     public static Entry entry(UUID id) { return ENTRIES.get(id); }
+
+    /** Online players whose cached zone is {@code zoneId} (cache only, no zone search). */
+    public static java.util.List<ServerPlayer> playersIn(MinecraftServer server, String zoneId) {
+        java.util.List<ServerPlayer> out = new java.util.ArrayList<>();
+        for (ServerPlayer p : server.getPlayerList().getPlayers()) {
+            Entry e = ENTRIES.get(p.getUUID());
+            if (e != null && e.zone != null && e.zone.id().equals(zoneId)) out.add(p);
+        }
+        return out;
+    }
 
     /** Cached zone if it is fresh (checked < 10 ticks ago, same dimension), else null. */
     public static ZoneView freshZone(ServerPlayer p) {

@@ -130,6 +130,25 @@ def opacCheck = tasks.register('checkOpacJar') {
 }
 tasks.named('compileJava') { dependsOn opacCheck }
 
+// KubeJS 2101.7.2 (+ its Rhino) for compileOnly: soft dependency, jars are NOT in the repo and never shipped.
+def kubejsJar = file(findProperty('kubejs_jar') ?: "${rootDir}/../ikaria-zones/mod-libs/kubejs-neoforge-2101.7.2-build.368.jar")
+def rhinoJar = file(findProperty('rhino_jar') ?: "${rootDir}/../ikaria-zones/mod-libs/rhino-2101.2.7-build.85.jar")
+def kubejsCheck = tasks.register('checkKubejsJar') {
+    def jars = [kubejsJar, rhinoJar]
+    doLast {
+        jars.each { jar ->
+            if (!jar.isFile()) {
+                throw new GradleException("Не найден jar для плагина KubeJS: ${jar}\n" +
+                        "Он нужен только для компиляции (compileOnly, в репозиторий не входит). " +
+                        "Укажите пути: ./gradlew build -Pkubejs_jar=/путь/kubejs-neoforge-2101.7.2-build.368.jar " +
+                        "-Prhino_jar=/путь/rhino-2101.2.7-build.85.jar " +
+                        "(или свойства kubejs_jar / rhino_jar в gradle.properties / ~/.gradle/gradle.properties).")
+            }
+        }
+    }
+}
+tasks.named('compileJava') { dependsOn kubejsCheck }
+
 dependencies {
     // Pure-JVM unit tests (no Minecraft bootstrap)
     testImplementation 'com.google.code.gson:gson:2.10.1'
@@ -140,6 +159,9 @@ dependencies {
     // Open Parties and Claims 0.32.7: soft dependency, compileOnly, the jar is NOT in the repo and never distributed.
     // Path: -Popac_jar=/path/to/open-parties-and-claims-neoforge-1.21.1-0.32.7.jar (or gradle.properties / ~/.gradle/gradle.properties).
     compileOnly files(opacJar)
+
+    // KubeJS 2101.7.2 and Rhino: soft dependency, compileOnly (see checkKubejsJar). Not shipped, not required at runtime.
+    compileOnly files(kubejsJar, rhinoJar)
 
     // Sable is a soft dependency accessed via reflection (see SableCompat): no jar needed to build.
     // Example optional mod dependency with JEI

@@ -24,6 +24,7 @@ public final class ZoneConfig {
     private final Map<String, List<Zone>> byDimension; // declaration order
     private final Map<String, Zone[]> lookupOrder; // priority desc, then declaration order
     private final Map<String, Zone> defaults;
+    private final boolean anyPvp, anyDamage, anyExplosion, anySpawn, anyRemoveHostile;
 
     /** Zones must have unique ids and acyclic, existing parents (the loader guarantees this). */
     public ZoneConfig(JsonObject globalRules, List<Zone> zones) {
@@ -58,6 +59,37 @@ public final class ZoneConfig {
         });
         this.lookupOrder = order;
         for (Zone z : zones) z.resolve(resolveRules(z), chainOf(z));
+        boolean pvp = false, dmg = false, exp = false, spw = false, rm = false;
+        for (Zone z : zones) {
+            if (z.mapOnly()) continue;
+            pvp |= z.rules().pvpForbidden();
+            dmg |= z.rules().hasDamageRules();
+            exp |= z.rules().hasExplosionRules();
+            spw |= z.rules().hasSpawnRules();
+            rm |= z.rules().removeHostileOnEnter;
+        }
+        anyPvp = pvp;
+        anyDamage = dmg;
+        anyExplosion = exp;
+        anySpawn = spw;
+        anyRemoveHostile = rm;
+    }
+
+    /** Fast exits for hot event handlers: false if no zone has the corresponding rule at all. */
+    public boolean anyPvpRules() { return anyPvp; }
+    public boolean anyDamageRules() { return anyDamage; }
+    public boolean anyExplosionRules() { return anyExplosion; }
+    public boolean anySpawnRules() { return anySpawn; }
+    public boolean anyRemoveHostile() { return anyRemoveHostile; }
+
+    /** All zones containing the point, highest priority first; the default zone (if any) is last. Map-only zones skipped. */
+    public List<Zone> zonesAt(String dimension, double x, double z) {
+        List<Zone> out = new ArrayList<>();
+        Zone[] order = lookupOrder.get(dimension);
+        if (order != null) for (Zone zone : order) if (zone.contains(x, z)) out.add(zone);
+        Zone def = defaults.get(dimension);
+        if (def != null) out.add(def);
+        return out;
     }
 
     private List<String> chainOf(Zone z) {

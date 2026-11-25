@@ -3,6 +3,7 @@ package com.poligorn.ikariaborders.zone;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.poligorn.ikariaborders.api.ZoneView;
+import com.poligorn.ikariaborders.rules.ZoneRules;
 
 import java.util.List;
 
@@ -39,6 +40,7 @@ public final class Zone {
     private volatile JsonObject resolvedRules;
     private volatile List<String> parentChain;
     private volatile ZoneView view;
+    private volatile ZoneRules parsedRules;
 
     public Zone(String id, String name, String dimension, Shape shape, boolean isDefault, int priority,
                 String parentId, JsonObject ownRules, boolean mapOnly, MapStyle map, JsonObject meta, int index) {
@@ -72,6 +74,21 @@ public final class Zone {
         if (isDefault) return true;
         if (shape == null || !bounds.contains(x, z)) return false;
         return shape.contains(x, z);
+    }
+
+    /** Parsed enforcement rules (PvP, damage, explosions, spawn, ...), computed once from the resolved rules. */
+    public ZoneRules rules() {
+        ZoneRules r = parsedRules;
+        if (r == null) parsedRules = r = ZoneRules.of(resolvedRules == null ? new JsonObject() : resolvedRules);
+        return r;
+    }
+
+    /** Resolved value of a custom flag from {@code rules.custom} (inherited), or null if not set. */
+    public JsonElement customFlag(String name) {
+        JsonElement c = resolvedRules == null ? null : resolvedRules.get("custom");
+        if (c == null || !c.isJsonObject()) return null;
+        JsonElement v = c.getAsJsonObject().get(name);
+        return v == null || v.isJsonNull() ? null : v;
     }
 
     public ZoneView view() {

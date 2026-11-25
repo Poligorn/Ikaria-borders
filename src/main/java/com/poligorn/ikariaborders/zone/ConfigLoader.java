@@ -32,14 +32,24 @@ public final class ConfigLoader {
     private final List<ConfigIssue> errors = new ArrayList<>();
     private final List<ConfigIssue> warnings = new ArrayList<>();
     private final Predicate<String> dimensionExists;
+    private final Predicate<String> flagKnown; // null = do not check custom flags
 
-    private ConfigLoader(Predicate<String> dimensionExists) {
+    private ConfigLoader(Predicate<String> dimensionExists, Predicate<String> flagKnown) {
         this.dimensionExists = dimensionExists;
+        this.flagKnown = flagKnown;
     }
 
     /** @param dimensionExists checks that a dimension id exists; null = only check syntax */
     public static Result parse(String json, Predicate<String> dimensionExists) {
-        ConfigLoader l = new ConfigLoader(dimensionExists);
+        return parse(json, dimensionExists, null);
+    }
+
+    /**
+     * @param flagKnown tells whether a custom flag ({@code rules.custom}) was declared via {@code registerFlag};
+     *                  an unknown flag is only a warning. null = skip the check (flags are registered by scripts after start)
+     */
+    public static Result parse(String json, Predicate<String> dimensionExists, Predicate<String> flagKnown) {
+        ConfigLoader l = new ConfigLoader(dimensionExists, flagKnown);
         ZoneConfig cfg = null;
         try {
             JsonElement root = JsonParser.parseString(json);
@@ -405,6 +415,33 @@ public final class ConfigLoader {
                             }
                             case "reasons", "denyEntities", "allowEntities" -> needStringArray(d.getValue(), dp);
                             default -> warn(dp, "неизвестное правило");
+                        }
+                    }
+                }
+                case "custom" -> {
+                    if (!v.isJsonObject()) { err(kp, "должно быть объектом {флаг: значение}"); break; }
+                    for (var c : v.getAsJsonObject().entrySet()) {
+                        String cp = kp + "." + c.getKey();
+                        if (c.getValue().isJsonNull()) err(cp, "значение флага не может быть null");
+                        else if (c.getKey().indexOf(':') < 0) warn(cp, "имя флага лучше писать с пространством имён, например 'ikaria:" + c.getKey() + "'");
+                        else if (flagKnown != null && !flagKnown.test(c.getKey())) warn(cp, "неизвестный флаг (не объявлен через registerFlag); значение сохранено");
+                    }
+                }
+                case "scripting" -> {
+                    if (!v.isJsonObject()) { err(kp, "должно быть объектом"); break; }
+                    for (var d : v.getAsJsonObject().entrySet()) {
+                        String dp = kp + "." + d.getKey();
+                        int min = switch (d.getKey()) {
+                            case "playerTickInterval" -> 5;
+                            case "zoneTickInterval" -> 20;
+                            default -> -1;
+                        };
+                        if (min < 0) { warn(dp, "неизвестное правило"); continue; }
+                        JsonElement dv = d.getValue();
+                        if (!(dv.isJsonPrimitive() && dv.getAsJsonPrimitive().isNumber()) || dv.getAsDouble() != Math.rint(dv.getAsDouble())) {
+                            err(dp, "должно быть целым числом (тиков)");
+                        } else if (dv.getAsDouble() < min) {
+                            warn(dp, "минимум " + min + " тиков; будет использовано " + min);
                         }
                     }
                 }
