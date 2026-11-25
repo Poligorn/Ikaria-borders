@@ -24,7 +24,7 @@ class ZoneMapCodecTest {
         assertTrue(b.length < 2048, "few KB at most, was " + b.length);
         ZoneMapData back = ZoneMapCodec.decode(b);
         assertEquals(d, back);
-        assertEquals(4, back.zones().size());
+        assertEquals(6, back.zones().size());
     }
 
     @Test

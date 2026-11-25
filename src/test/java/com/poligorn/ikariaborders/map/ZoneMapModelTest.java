@@ -176,12 +176,17 @@ class ZoneMapModelTest {
     @Test
     void defaultZonesWithShowFalseNeverFillTheDimension() throws IOException {
         ZoneMapData d = ZoneMapData.of(ConfigLoader.parse(exampleJson(), null).config());
-        assertEquals(Set.of("wild", "build", "spawn", "edge"), d.zones().stream().map(MapZone::id).collect(java.util.stream.Collectors.toSet()));
+        assertEquals(Set.of("wild", "build", "spawn", "edge", "nether", "end"), d.zones().stream().map(MapZone::id).collect(java.util.stream.Collectors.toSet()));
         ZoneMapModel m = new ZoneMapModel();
         m.setData(d);
         assertNotNull(m.colors(WM, OW, 5000, 5000)); // wild (show:true, fill) fills the overworld
-        assertNull(m.colors(WM, "minecraft:the_nether", 0, 0)); // nether/end defaults stay show:false
-        assertFalse(m.regionHasHighlights(WM, "minecraft:the_nether", 0, 0));
+        int red = ((int) Math.round(0.3 * 255) << 24) | 0xFF3030; // #FF3030 @ 0.3
+        for (String dim : new String[]{"minecraft:the_nether", "minecraft:the_end"}) {
+            assertNotNull(m.colors(WM, dim, 0, 0)); // nether/end are wild lands: red fill
+            assertEquals(red, m.colors(WM, dim, 0, 0)[0]);
+            assertEquals("Дикие земли — приват запрещён", m.tooltip(WM, dim, 0, 0));
+            assertTrue(m.regionHasHighlights(WM, dim, 0, 0));
+        }
     }
 
     @Test
