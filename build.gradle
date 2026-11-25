@@ -149,6 +149,25 @@ def kubejsCheck = tasks.register('checkKubejsJar') {
 }
 tasks.named('compileJava') { dependsOn kubejsCheck }
 
+// Xaero's World Map 1.47.0 / Minimap 26.6.0 for compileOnly: soft client dependencies, jars are NOT in the repo and never shipped.
+def xaeroWorldMapJar = file(findProperty('xaero_worldmap_jar') ?: "${rootDir}/../ikaria-zones/mod-libs/xaeroworldmap-neoforge-1.21.1-1.47.0.jar")
+def xaeroMinimapJar = file(findProperty('xaero_minimap_jar') ?: "${rootDir}/../ikaria-zones/mod-libs/xaerominimap-neoforge-1.21.1-26.6.0.jar")
+def xaeroCheck = tasks.register('checkXaeroJars') {
+    def jars = [xaeroWorldMapJar, xaeroMinimapJar]
+    doLast {
+        jars.each { jar ->
+            if (!jar.isFile()) {
+                throw new GradleException("Не найден jar Xaero: ${jar}\n" +
+                        "Он нужен только для компиляции (compileOnly, в репозиторий не входит, в мод не попадает). " +
+                        "Укажите пути: ./gradlew build -Pxaero_worldmap_jar=/путь/xaeroworldmap-neoforge-1.21.1-1.47.0.jar " +
+                        "-Pxaero_minimap_jar=/путь/xaerominimap-neoforge-1.21.1-26.6.0.jar " +
+                        "(или свойства xaero_worldmap_jar / xaero_minimap_jar в gradle.properties / ~/.gradle/gradle.properties).")
+            }
+        }
+    }
+}
+tasks.named('compileJava') { dependsOn xaeroCheck }
+
 dependencies {
     // Pure-JVM unit tests (no Minecraft bootstrap)
     testImplementation 'com.google.code.gson:gson:2.10.1'
@@ -162,6 +181,9 @@ dependencies {
 
     // KubeJS 2101.7.2 and Rhino: soft dependency, compileOnly (see checkKubejsJar). Not shipped, not required at runtime.
     compileOnly files(kubejsJar, rhinoJar)
+
+    // Xaero's World Map / Minimap: soft client dependencies, compileOnly (see checkXaeroJars). Not shipped, not required at runtime.
+    compileOnly files(xaeroWorldMapJar, xaeroMinimapJar)
 
     // Sable is a soft dependency accessed via reflection (see SableCompat): no jar needed to build.
     // Example optional mod dependency with JEI

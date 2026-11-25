@@ -10,6 +10,7 @@ import com.poligorn.ikariaborders.PlayerZoneTracker;
 import com.poligorn.ikariaborders.SableCompat;
 import com.poligorn.ikariaborders.ZoneManager;
 import com.poligorn.ikariaborders.script.ScriptBridge;
+import com.poligorn.ikariaborders.sync.SyncService;
 import com.poligorn.ikariaborders.zone.ConfigIssue;
 import com.poligorn.ikariaborders.zone.Zone;
 import com.poligorn.ikariaborders.zone.ZoneConfig;
@@ -59,6 +60,10 @@ public final class BordersCommand {
                 .then(Commands.literal("claims").requires(s -> s.hasPermission(2))
                         .then(Commands.literal("scan").executes(c -> claimsRun(c.getSource(), ClaimSweeper.Mode.SCAN)))
                         .then(Commands.literal("sweep").executes(c -> claimsRun(c.getSource(), ClaimSweeper.Mode.MANUAL))))
+                .then(Commands.literal("resync").requires(s -> s.hasPermission(2))
+                        .executes(c -> resync(c.getSource(), null))
+                        .then(Commands.argument("player", EntityArgument.player())
+                                .executes(c -> resync(c.getSource(), EntityArgument.getPlayer(c, "player")))))
                 .then(Commands.literal("scripts").requires(s -> s.hasPermission(2)).executes(c -> scripts(c.getSource())))
                 .then(Commands.literal("legacy-cleanup").requires(s -> s.hasPermission(2))
                         .executes(c -> legacy(c.getSource(), false))
@@ -177,6 +182,21 @@ public final class BordersCommand {
         }
         reply(src, sb.toString());
         return 1;
+    }
+
+    // ---- resync ----
+
+    private static int resync(CommandSourceStack src, ServerPlayer target) {
+        if (target != null) {
+            boolean ok = SyncService.send(target);
+            reply(src, ok ? "Данные карты отправлены игроку " + target.getGameProfile().getName() + " (зон: " + SyncService.zoneCount() + ", " + SyncService.payloadSize() + " байт)"
+                    : "У игрока " + target.getGameProfile().getName() + " нет мода Ikaria Borders — данные не отправлены");
+            return ok ? 1 : 0;
+        }
+        int n = SyncService.broadcast(src.getServer());
+        reply(src, "Данные карты отправлены клиентам: " + n + " из " + src.getServer().getPlayerList().getPlayerCount()
+                + " игроков (зон: " + SyncService.zoneCount() + ", " + SyncService.payloadSize() + " байт)");
+        return n;
     }
 
     // ---- claims ----

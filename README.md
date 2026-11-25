@@ -8,14 +8,16 @@
 
 **Этап 0.3** (в ревью, не влит): применение правил зон — PvP, урон, взрывы, спавн мобов; мягкий плагин KubeJS (`IkariaBorders`, `IkariaBordersEvents`, свои флаги, данные зон, изоляция ошибок и бюджет времени), `/borders scripts`. Без KubeJS правила работают, скриптов нет. По умолчанию в конфиге PvP запрещён только на спавне, остальные правила выключены (ванилла).
 
-Ещё не реализовано: динамические зоны и runtime-правила (0.45), линии на карте Xaero (0.4).
+**Этап 0.4** (в работе, не влит): клиентская часть — линии зон на World Map и миникарте Xaero (по чанкам, как проверка приватов), синхронизация по необязательному каналу `ikaria_borders:sync` (вход, `/borders reload`, `/borders resync [player]`), клиентский конфиг `config/ikaria_borders-client.toml` (`enabled`, `worldMap`, `minimap`, `opacityMultiplier`, `hiddenZones`) и клавиша-переключатель (по умолчанию не назначена). Клиент без мода входит на сервер как обычно; на сервере без мода клиентская часть молчит. Без Xaero линий нет. Это не проверено в игре: нужен клиент с Xaero.
+
+Ещё не реализовано: динамические зоны и runtime-правила (0.45).
 
 Канон: [docs/TZ_ikaria_borders_v2.md](docs/TZ_ikaria_borders_v2.md) (v2.1). Правила для агентов: [CLAUDE.md](CLAUDE.md).
 
 - Mod id: `ikaria_borders`
 - Пакет: `com.poligorn.ikariaborders`
 - Конфиг: `config/ikaria_borders/zones.json` (пример: `zones.example.json`)
-- Сборка: `./gradlew build` (Java 21). Для компиляции нужны jar OPAC 0.32.7 и KubeJS 2101.7.2 с Rhino (в репозиторий не входят, в мод не попадают): по умолчанию из `../ikaria-zones/mod-libs/`, иначе `-Popac_jar=…`, `-Pkubejs_jar=…`, `-Prhino_jar=…`. Автотесты геометрии и валидации — `./gradlew test`.
+- Сборка: `./gradlew build` (Java 21). Для компиляции нужны jar OPAC 0.32.7, KubeJS 2101.7.2 с Rhino и Xaero World Map 1.47.0 / Minimap 26.6.0 (в репозиторий не входят, в мод не попадают): по умолчанию из `../ikaria-zones/mod-libs/`, иначе `-Popac_jar=…`, `-Pkubejs_jar=…`, `-Prhino_jar=…`, `-Pxaero_worldmap_jar=…`, `-Pxaero_minimap_jar=…`. Автотесты геометрии и валидации — `./gradlew test`.
 
 ## Лицензия
 

@@ -5,6 +5,7 @@ import com.poligorn.ikariaborders.command.BordersCommand;
 import com.poligorn.ikariaborders.enforce.HostileRemover;
 import com.poligorn.ikariaborders.opac.OpacBridge;
 import com.poligorn.ikariaborders.script.ScriptBridge;
+import com.poligorn.ikariaborders.sync.SyncService;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -56,7 +57,10 @@ public final class BordersEvents {
 
     @SubscribeEvent
     public static void onLogin(PlayerEvent.PlayerLoggedInEvent e) {
-        if (e.getEntity() instanceof ServerPlayer p) PlayerZoneTracker.onLogin(p);
+        if (e.getEntity() instanceof ServerPlayer p) {
+            PlayerZoneTracker.onLogin(p);
+            SyncService.send(p); // map data for clients that have the mod (no-op for vanilla)
+        }
     }
 
     @SubscribeEvent
