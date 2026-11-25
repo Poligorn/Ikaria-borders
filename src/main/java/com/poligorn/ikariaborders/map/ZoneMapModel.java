@@ -14,7 +14,9 @@ import java.util.Objects;
  * <p>Semantics (per dimension, among visible zones = {@code map.show} and not in {@code hiddenZones}):
  * <ul>
  *   <li><b>Zone of a chunk</b> = highest priority zone containing the chunk centre (cx*16+8, cz*16+8); ties: declared first.
- *       Fill colour comes from that zone if its style has {@code fill}.</li>
+ *       Fill colour comes from that zone if its style has {@code fill}. The same zone supplies the tooltip over its whole
+ *       area (outline-only zones too: interior chunks are "highlit" transparently, nothing is drawn); map-only zones
+ *       do not label their interior, only their own border chunks.</li>
  *   <li><b>Side colours</b>: for each of N/E/S/W the highest-priority zone with {@code outline} for which this side is
  *       a border of <i>that zone's own shape</i> (side {@code inner}: chunk inside, neighbour outside;
  *       {@code outer}: chunk outside, neighbour inside). So a map-only zone nested under others only outlines its own edge.</li>
@@ -156,7 +158,7 @@ public final class ZoneMapModel {
         return colors(t, dim, cx, cz) != null;
     }
 
-    /** Zone whose colour is shown on this chunk (fill zone, else the strongest border zone), or null. */
+    /** Tooltip zone: first (by priority) non-map-only zone containing the chunk, even without fill; else the border zone drawn on it; or null. */
     public MapZone zoneForTooltip(MapTarget t, String dim, int cx, int cz) {
         if (!settings.active(t)) return null;
         DimView v = dims.get(dim);
@@ -229,7 +231,8 @@ public final class ZoneMapModel {
                 for (int i = 0; i < n; i++) { // zone of the chunk: first containing, by priority
                     if (in[i] != null && in[i][gi]) {
                         if (!v.zones[i].shadowsFill()) continue; // map-only outline (edge) does not hide the fill below it
-                        if (v.zones[i].fill() && argb[i] != 0) { center = argb[i]; tip = v.zones[i]; }
+                        tip = v.zones[i]; // tooltip covers the whole zone, even outline-only
+                        if (v.zones[i].fill() && argb[i] != 0) center = argb[i];
                         break;
                     }
                 }
@@ -252,7 +255,7 @@ public final class ZoneMapModel {
                         }
                     }
                 }
-                if (center == 0 && !border) continue;
+                if (center == 0 && !border && tip == null) continue; // tip-only chunk: highlit transparently, nothing drawn
                 int o = li * 5;
                 out.colors[o] = center;
                 out.colors[o + 1] = side[0];
