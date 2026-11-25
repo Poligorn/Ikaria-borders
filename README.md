@@ -12,3 +12,7 @@
 - Пакет: `com.poligorn.ikariaborders`
 - Конфиг: `config/ikaria_borders/zones.json` (пример: `zones.example.json`)
 - Сборка: `./gradlew build` (Java 21). Автотесты геометрии и валидации — `./gradlew test`.
+
+## Лицензия
+
+MIT, copyright (c) 2026 Egor Skuratov / Poligorn. Полный текст — в файле [LICENSE](LICENSE).

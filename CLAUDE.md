@@ -17,7 +17,7 @@
 - API-пакет: `com.poligorn.ikariaborders.api`
 - Конфиг: `config/ikaria_borders/zones.json` (JSON, не TOML/JSON5)
 - Команда: `/borders`, алиас `/zones` (через redirect Brigadier)
-- Лицензия в gradle/mods.toml: All Rights Reserved (как у других модов Ikaria; вопрос §19.12 ещё открыт, MIT не ставить)
+- Лицензия репозитория: MIT (см. [LICENSE](LICENSE)), copyright 2026 Egor Skuratov / Poligorn; `mod_license=MIT` в gradle.properties. Вопрос §19.12 закрыт (25.11.2026). Пакет остаётся `com.poligorn.ikariaborders`.
 
 ## Стек
 
