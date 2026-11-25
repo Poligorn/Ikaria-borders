@@ -1,0 +1,15 @@
+{
+  "required": false,
+  "minVersion": "0.8",
+  "package": "com.poligorn.ikariaborders.xaero.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "plugin": "com.poligorn.ikariaborders.xaero.mixin.XaeroMixinPlugin",
+  "mixins": [],
+  "client": [
+    "WorldMapRegistryMixin",
+    "MinimapRegistryMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

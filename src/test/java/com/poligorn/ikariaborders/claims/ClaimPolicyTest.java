@@ -69,9 +69,13 @@ class ClaimPolicyTest {
             assertTrue(ClaimPolicy.check(c, OW, 0, 0, a, PLAYER).allowed(), "spawn allows " + a);
         }
         assertEquals("wild", ClaimPolicy.check(c, OW, 200, 200, ClaimActionType.CLAIM, PLAYER).zone().id());
-        // nether / end have no claims rules: vanilla, allowed
-        assertTrue(ClaimPolicy.check(c, "minecraft:the_nether", 500, 500, ClaimActionType.CLAIM, PLAYER).allowed());
-        assertTrue(ClaimPolicy.check(c, "minecraft:the_end", 500, 500, ClaimActionType.CLAIM, PLAYER).allowed());
+        // nether / end are whole-dimension wild lands: players denied, server owner allowed
+        for (String dim : new String[]{"minecraft:the_nether", "minecraft:the_end"}) {
+            for (ClaimActionType a : new ClaimActionType[]{ClaimActionType.CLAIM, ClaimActionType.FORCELOAD, ClaimActionType.ANCHOR}) {
+                assertFalse(ClaimPolicy.check(c, dim, 500, 500, a, PLAYER).allowed(), dim + " denies " + a);
+                assertTrue(ClaimPolicy.check(c, dim, 500, 500, a, ClaimPolicy.SERVER_OWNER).allowed(), dim + " server " + a);
+            }
+        }
     }
 
     @Test void unActionsAreAlwaysAllowed() throws IOException {

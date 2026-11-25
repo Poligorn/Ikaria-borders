@@ -6,7 +6,7 @@
 ## Жёсткие правила
 
 - Никогда не мержить, не ставить теги и не публиковать релиз без явного OK от Egor (Poligorn).
-- Работа только в ветке + PR. Сейчас рабочая ветка: `feat/0.3-core` (создана из `feat/0.2-core`), база: `docs/tz` (0.1 влит в `docs/tz`; 0.2 в ревью).
+- Работа только в ветке + PR. Сейчас рабочая ветка: `feat/0.4-client` (создана из `feat/0.3-core`), база: `docs/tz` (0.1 влит в `docs/tz`; 0.2 и 0.3 в ревью).
 - Не печатать ключи, токены и секреты.
 - Быть честным, что не проверено в игре.
 
@@ -25,9 +25,22 @@
 - Целевая версия NeoForge: **21.1.250** (тестовый сервер) или совместимая 21.1.252; диапазон `[21.1.219,)`.
 - Parchment: 1.21.1 / 2024.11.17.
 - Жёстких зависимостей кроме NeoForge нет.
-- Мягкие (compileOnly / optional, код устойчив к их отсутствию): KubeJS 2101.7.2 (mod id `kubejs`, `compileOnly files(kubejs_jar, rhino_jar)`, в mods.toml `optional` без диапазона версий; jar'ы **не** в репозитории, по умолчанию `../ikaria-zones/mod-libs/kubejs-neoforge-2101.7.2-build.368.jar` и `rhino-2101.2.7-build.85.jar`), Sable 2.0.6 (reflection), Open Parties and Claims 0.32.7 (mod id `openpartiesandclaims`, `compileOnly files(opac_jar)`, в mods.toml `optional`; jar в репозиторий **не** кладём, путь — свойство gradle `opac_jar`, по умолчанию `../ikaria-zones/mod-libs/…`). Позже Xaero.
+- Мягкие (compileOnly / optional, код устойчив к их отсутствию): Xaero's World Map 1.47.0 и Minimap 26.6.0 (mod id `xaeroworldmap` / `xaerominimap`, только клиент, `compileOnly files(xaero_worldmap_jar, xaero_minimap_jar)`, в mods.toml `optional` без диапазона версий; jar'ы **не** в репозитории и не в моде, по умолчанию `../ikaria-zones/mod-libs/…`), KubeJS 2101.7.2 (mod id `kubejs`, `compileOnly files(kubejs_jar, rhino_jar)`, в mods.toml `optional` без диапазона версий; jar'ы **не** в репозитории, по умолчанию `../ikaria-zones/mod-libs/kubejs-neoforge-2101.7.2-build.368.jar` и `rhino-2101.2.7-build.85.jar`), Sable 2.0.6 (reflection), Open Parties and Claims 0.32.7 (mod id `openpartiesandclaims`, `compileOnly files(opac_jar)`, в mods.toml `optional`; jar в репозиторий **не** кладём, путь — свойство gradle `opac_jar`, по умолчанию `../ikaria-zones/mod-libs/…`). 
 
-## Этап 0.3 (текущий, `feat/0.3-core`; в работе, не влит; не выходить за этот объём)
+## Этап 0.4 (текущий, `feat/0.4-client`; в работе, не влит; не выходить за этот объём)
+
+По ТЗ §4, §10, §11; тесты 11–13, 15 (нужен клиент Egor):
+
+- **Синхронизация** (`sync.*`): один payload `ikaria_borders:sync` (`SyncPayload`, регистрация в `SyncNetwork` на `RegisterPayloadHandlersEvent`, канал **optional**). Тело — непрозрачный `byte[]` (≤ 512 КБ), формат в чистом `map.ZoneMapCodec` (без Minecraft, тестируется без игры). Содержит версию (FNV-1a по данным карты) и только зоны с `map.show: true` (в т.ч. `mapOnly`): id, имя, измерение, форма, приоритет, стиль, цвет, прозрачность, `side`, `label`. Правил нет, зоны по умолчанию с `show: false` не отправляются. Отправка: вход игрока, `/borders reload` (всем), `/borders resync [player]` (уровень 2). Клиентам без канала (`hasChannel`) не шлём.
+- **Клиент** (`client.*`, `map.*`, `xaero.*`): чистое ядро `map.ZoneMapModel` (кэш регионов 32×32 чанка, LRU 256, AABB-отсечение, чанк по центру `cx*16+8`) + два тонких адаптера `xaero.WorldMapZoneHighlighter` / `xaero.MinimapZoneHighlighter`. Регистрация — mixin `HEAD` в `HighlighterRegistry.end()` обоих модов (`xaero.mixin.*`, `require = 0`, включаются плагином `XaeroMixinPlugin` только при наличии соответствующего Xaero). Логические цвета модели `ZoneMapModel.colors`: `[центр, С(−Z), В(+X), Ю(+Z), З(−X)]`, ARGB, плюс маска сторон с границей (цвет стороны может совпадать с заливкой, поэтому «сторона == центр» признаком границы быть не может). **Цвет в highlighter Xaero — BGRA `0xBBGGRRAA` (альфа в младшем байте), не ARGB** (`AbstractHighlighter.getBlend`, `ClaimsHighlighter`; из-за ARGB `#55FF55` рисовался лососевым); упаковка — `map.XaeroColor`. Highlighter'ы переопределяют `getChunkHighlitColor` и отдают растр 16×16 (`map.ChunkHighlightRaster`, индекс `(z<<4)|x`): заливка `opacity × opacityMultiplier`, поверх диагональная штриховка того же цвета (в мировых пикселях, стыкуется между чанками), на границе стороны с `outline` — жирная непрозрачная обводка. Приоритет пикселя: обводка > штрих > заливка. Штриховка только при `fill`. Ключи клиентского конфига (в ТЗ §11 их нет, значения выбраны разумные): `outlineWidth=2` (1–8), `hatchStep=4` (2–16), `hatchWidth=1`, `hatchOpacity=0.7` (× `opacityMultiplier`). Не проверено в игре после этого фикса: цвет, вид штриховки и обводки.
+- Семантика: зона чанка — наивысший приоритет среди видимых зон; заливка от неё, если в `style` есть `fill`. Сторона — граница **формы** зоны с `outline` (`inner`: чанк внутри, сосед снаружи; `outer` — наоборот), побеждает больший приоритет. Поэтому `mapOnly`-зона `edge` рисует линию только на своей границе (10000), а не на границе `build`. `mapOnly`-зона без `fill` не затеняет заливку нижней зоны (`MapZone.mapOnly`, в формате кодека; иначе `edge` скрыл бы заливку wild). Ад и Энд (`nether`/`end`, default-зоны) — как `wild`: приват запрещён, та же заливка/штриховка и подсказка; серверные приваты разрешены (решение Egor, 25.11.2026). После влива 0.4 в §22 ветки `docs/tz-reclaim` (PR #5) поправить допущение «Ад/Энд не затрагиваются, приваты разрешены, вопрос 19.2»: приваты там больше не разрешены; reclaim включать или нет — отдельное решение. Пример: `wild` — заливка `#FF3030` 0.3 (штриховка = приват запрещён, подсказка «Дикие земли — приват запрещён»), `build` — синяя обводка `#3399FF`, `spawn` — зелёная обводка `#55FF55`, заливки у них нет.
+- Клиентский конфиг `config/ikaria_borders-client.toml`: `enabled`, `worldMap`, `minimap`, `opacityMultiplier`, `hiddenZones`; клавиша-переключатель (по умолчанию не назначена, в памяти, не сохраняется). Сообщение — в чат, не actionbar. Миникарту в Аду не трогаем.
+- Серверный код не грузит клиентские типы и Xaero: клиент — только в `client`/`xaero`; `XaeroCompat` трогает классы Xaero лишь если мод загружен. Любая ошибка Xaero — русский лог и работа без линий.
+- Версия мода `0.4.0`.
+- Не входит: динамические зоны, `overrideShape`, runtime `setRule`/`setColor`, `/borders dynamic|overrides` (0.45); захват; `fireSpread`; точные (по блокам) линии.
+- Не проверено в игре: всё Xaero-специфичное — срабатывание mixin на `end()` (имя метода и сигнатуры взяты из `javap`), порядок сторон цвета (выведен из байткода `ChunkHighlighter.getChunkHighlitColor` и `TestHighlighter`, в игре не видели), `clearAllCachedHighlightHashes()` / `requestRefresh()` после reload (исчезают ли старые линии), `LoadingModList` в плагине mixin, optional-канал с ванильным клиентом, подсказки на World Map и миникарте, клавиша, поведение с OPAC на одном чанке, производительность на реальной карте (тесты 11–13, 15).
+
+## Этап 0.3 (реализован в `feat/0.3-core`, в ревью)
 
 По ТЗ §6.1–6.3, §21.1–21.3, §21.5 (данные и флаги), §21.7; тесты 6–9, 16, 17, 21, 22.
 
@@ -35,7 +48,7 @@
 - **Порядок**: сначала встроенные правила, потом скрипты. Скрипт только ужесточает: для уже отменённого правилом событие скрипту не отдаётся. OPAC/OPAC Warfare защищают сами, действует строжайшее.
 - **KubeJS** — мягкая зависимость через мост `script.ScriptBridge` + интерфейс `ScriptHooks` (без типов KubeJS). Типы KubeJS и Rhino только в пакете `kubejs` (плагин `IkariaKubeJSPlugin` в `kubejs.plugins.txt`); без KubeJS мод работает как в 0.2. Глобальный объект `IkariaBorders` (`script.IkariaBordersJS`, `ZoneJS`, `zone.data`/`zone.temp`, `registerFlag`/`zone.flag`) и группа событий `IkariaBordersEvents` со всеми событиями §21.2 (`dynamicZoneExpired` зарегистрировано, но не вызывается до 0.45). Запросы: `distanceToBorder`, `depth`, `zonesAt` есть и в Java API (`IkariaBordersAPI`).
 - **Изоляция и бюджет** (§21.7): `script.ScriptGuard`, `ScriptBudget`, `ScriptStats`; слушатели вызываются по одному через `kubejs.Dispatcher`; команда `/borders scripts` (уровень 2). Всё на основном потоке; вызов API из другого потока — понятная ошибка.
-- Не входит: динамические зоны, `overrideShape`, runtime `setRule`/`setColor`, `/borders dynamic|overrides|resync` (0.45); клиент, пакеты, Xaero (0.4); захват (CONCEPT.md §7).
+- Не входит: динамические зоны, `overrideShape`, runtime `setRule`/`setColor`, `/borders dynamic|overrides` (0.45); клиент, пакеты, Xaero (0.4); захват (CONCEPT.md §7).
 - Не проверено в игре: всё KubeJS-специфичное (загрузка плагина, целевые события `playerEnter('wild', …)`, `hasResult`/`cancel`, `EventExceptionHandler`, свойства бинов в Rhino), `PositionCheck` для всех причин спавна, чанки/`forEachLoadedChunk`, подмена `replace`, `ExplosionEvent.Detonate` на живых взрывах, поведение рядом с OPAC.
 
 ## Этап 0.2 (реализован в `feat/0.2-core`, в ревью)
@@ -65,11 +78,10 @@
 - Пример конфига из §8.2 (`zones.json` / `zones.example.json`).
 - Сборка: `./gradlew build` и тесты зелёные.
 
-## Не входит в 0.3 (0.4+)
+## Не входит в 0.4 (0.45+)
 
-- Клиентская синхронизация и отрисовка Xaero (пакет sync можно не делать; reload клиентам не рассылать).
-- Динамические зоны, `overrideShape`, runtime-правила и методы карты, `/borders dynamic|overrides|resync` (0.45), концепт захвата (CONCEPT.md §7), `fireSpread`.
-- Mixins.
+- Динамические зоны, `overrideShape`, runtime-правила и методы карты, `/borders dynamic|overrides` (0.45), концепт захвата (CONCEPT.md §7), `fireSpread`.
+- Серверные mixins (клиентские mixin'ы Xaero — только в 0.4, см. выше).
 
 ## Сообщения и код
 

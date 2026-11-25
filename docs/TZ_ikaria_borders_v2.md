@@ -189,10 +189,10 @@ OPAC и OPAC Warfare свою защиту сохраняют. Действуе�
 | `build` «Зона застройки» | square half=1500 | 20 | да | ванилла | можно |
 | `wild` «Дикие земли» (по умолчанию для верхнего мира) | всё измерение | 0 | да | ванилла | **только серверные** |
 | `edge` «Край мира» | square half=10000, только на карте | 5 | — | — | — |
-| `nether` (по умолчанию для Ада) | всё измерение | 0 | да | ванилла | можно, как сейчас (**открытый вопрос**) |
-| `end` (по умолчанию для Энда) | всё измерение | 0 | да | ванилла | можно, как сейчас (**открытый вопрос**) |
+| `nether` (по умолчанию для Ада) | всё измерение | 0 | да | ванилла | **только серверные** (как у `wild`), на карте красная штриховка |
+| `end` (по умолчанию для Энда) | всё измерение | 0 | да | ванилла | **только серверные** (как у `wild`), на карте красная штриховка |
 
-Для Ада и Энда особых правил нет, пока не решено иначе: PvP включено, остальное — ванилла.
+Ад и Энд — целиком дикие земли (решение Egor, 25.11.2026): приваты игроков запрещены во всём измерении, как в `wild`, серверные разрешены; PvP включено, остальное — ванилла. Правила заданы у самих зон `nether`/`end`, а не через `parent`.
 
 ---
 
@@ -246,7 +246,7 @@ OPAC и OPAC Warfare свою защиту сохраняют. Действуе�
       "id": "wild", "name": "Дикие земли", "dimension": "minecraft:overworld",
       "default": true, "priority": 0,
       "rules": { "pvp": true, "claims": { "allow": false, "forceload": false, "anchor": false } },
-      "map": { "show": false },
+      "map": { "show": true, "color": "#FF3030", "style": "fill", "opacity": 0.3, "label": "Дикие земли — приват запрещён" },
       "meta": { "hud": "wild" }
     },
     {
@@ -254,7 +254,7 @@ OPAC и OPAC Warfare свою защиту сохраняют. Действуе�
       "shape": { "type": "square", "center": [0, 0], "half": 1500 },
       "priority": 20, "parent": "wild",
       "rules": { "claims": { "allow": true, "forceload": true, "anchor": true } },
-      "map": { "show": true, "color": "#FF3030", "style": "outline", "opacity": 0.6, "label": "Граница диких земель" },
+      "map": { "show": true, "color": "#3399FF", "style": "outline", "opacity": 1, "label": "Зона застройки" },
       "meta": { "hud": "build" }
     },
     {
@@ -262,7 +262,7 @@ OPAC и OPAC Warfare свою защиту сохраняют. Действуе�
       "shape": { "type": "square", "center": [0, 0], "half": 100 },
       "priority": 30, "parent": "build",
       "rules": { "pvp": false },
-      "map": { "show": true, "color": "#55FF55", "style": "fill+outline", "opacity": 0.25 },
+      "map": { "show": true, "color": "#55FF55", "style": "outline", "opacity": 1 },
       "meta": { "hud": "spawn" }
     },
     {
@@ -271,8 +271,8 @@ OPAC и OPAC Warfare свою защиту сохраняют. Действуе�
       "priority": 5, "mapOnly": true,
       "map": { "show": true, "color": "#AA00FF", "style": "outline", "side": "inner" }
     },
-    { "id": "nether", "name": "Ад", "dimension": "minecraft:the_nether", "default": true, "priority": 0, "rules": { "pvp": true }, "meta": { "hud": "nether" }, "map": { "show": false } },
-    { "id": "end", "name": "Энд", "dimension": "minecraft:the_end", "default": true, "priority": 0, "rules": { "pvp": true }, "meta": { "hud": "end" }, "map": { "show": false } }
+    { "id": "nether", "name": "Ад", "dimension": "minecraft:the_nether", "default": true, "priority": 0, "rules": { "pvp": true, "claims": { "allow": false, "forceload": false, "anchor": false } }, "meta": { "hud": "nether" }, "map": { "show": true, "color": "#FF3030", "style": "fill", "opacity": 0.3, "label": "Дикие земли — приват запрещён" } },
+    { "id": "end", "name": "Энд", "dimension": "minecraft:the_end", "default": true, "priority": 0, "rules": { "pvp": true, "claims": { "allow": false, "forceload": false, "anchor": false } }, "meta": { "hud": "end" }, "map": { "show": true, "color": "#FF3030", "style": "fill", "opacity": 0.3, "label": "Дикие земли — приват запрещён" } }
   ]
 }
 ```
@@ -287,7 +287,7 @@ OPAC и OPAC Warfare свою защиту сохраняют. Действуе�
 }
 ```
 
-Поля `map`: `show`, `color` (#RRGGBB), `opacity` 0–1, `style` (`outline` / `fill` / `fill+outline`), `side` (`inner` / `outer` — по какую сторону границы красить чанки обводки), `label` (подсказка при наведении; по умолчанию `name`).
+Поля `map`: `show`, `color` (#RRGGBB), `opacity` 0–1, `style` (`outline` / `fill` / `fill+outline`), `side` (`inner` / `outer` — по какую сторону границы красить чанки обводки), `label` (подсказка при наведении; по умолчанию `name`). Заливка (`fill`) рисуется на карте со штриховкой: в примере так показаны дикие земли — «занято, приват запрещён»; у `spawn`/`build` только обводка.
 
 ### 8.3. Загрузка и проверка
 
@@ -495,11 +495,12 @@ OPAC и OPAC Warfare свою защиту сохраняют. Действуе�
 - Название «Ikaria Borders», репозиторий создан.
 
 **Закрыто 25.11.2026:**
+- §19.2 (Ад и Энд): приваты игроков запрещены во всём измерении (как в `wild`), серверные разрешены; на карте красная штриховка `#FF3030`. Ответ Egor (Poligorn) от 25.11.2026.
 - §19.12 (пакет и лицензия): пакет `com.poligorn.ikariaborders` (выбран раньше), лицензия репозитория — **MIT**, copyright 2026 Egor Skuratov / Poligorn. Ответ Egor (Poligorn) от 25.11.2026.
 
 **Осталось:**
 1. **Формат конфига:** JSON (рекомендую) или TOML/JSON5?
-2. **Ад и Энд:** можно ли там приватить, нужны ли особые правила? Пока по умолчанию PvP включено, приваты разрешены, остальное — ванилла.
+2. ~~**Ад и Энд**~~ — **закрыто 25.11.2026**, см. «Закрыто 25.11.2026» выше.
 3. **Урон на спавне**, кроме PvP: отключать ли падение, взрывы, огонь, спавн враждебных мобов? Пока всё выключено.
 4. **PvP-проверка:** запрещать, если хотя бы один из игроков на спавне (`both`, рекомендую), или смотреть только на жертву?
 5. **Граница привата по центру чанка** (как сейчас) — подходит?

@@ -13,6 +13,10 @@ description='''
 Зоны и границы для сервера MC-Ikaria: формы, приоритеты, наследование правил, API для скриптов.
 '''
 
+# Client-side map lines (mixin is enabled by the config plugin only if the matching Xaero mod is present).
+[[mixins]]
+config="ikaria_borders.mixins.json"
+
 [[dependencies.${mod_id}]]
     modId="neoforge"
     type="required"
@@ -40,3 +44,16 @@ description='''
     type="optional"
     ordering="AFTER"
     side="BOTH"
+
+# Optional (client): Xaero's World Map / Minimap. Without them there are no zone lines on the maps. No version range on purpose.
+[[dependencies.${mod_id}]]
+    modId="xaeroworldmap"
+    type="optional"
+    ordering="AFTER"
+    side="CLIENT"
+
+[[dependencies.${mod_id}]]
+    modId="xaerominimap"
+    type="optional"
+    ordering="AFTER"
+    side="CLIENT"

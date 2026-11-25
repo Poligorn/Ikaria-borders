@@ -4,6 +4,7 @@ import com.mojang.logging.LogUtils;
 import com.poligorn.ikariaborders.api.ZonesReloadedEvent;
 import com.poligorn.ikariaborders.script.FlagRegistry;
 import com.poligorn.ikariaborders.script.ScriptBridge;
+import com.poligorn.ikariaborders.sync.SyncService;
 import com.poligorn.ikariaborders.zone.ConfigIssue;
 import com.poligorn.ikariaborders.zone.ConfigLoader;
 import com.poligorn.ikariaborders.zone.ZoneConfig;
@@ -96,6 +97,7 @@ public final class ZoneManager {
         ScriptBridge.configLoaded(announce);
         NeoForge.EVENT_BUS.post(new ZonesReloadedEvent(n));
         if (announce) ClaimSweeper.onReload(before, current); // sweep only on /borders reload, not at startup
+        if (announce && server != null) SyncService.broadcast(server); // map data to all online clients (TZ §10)
         return new ReloadResult(true, n, List.of(), res.warnings());
     }
 

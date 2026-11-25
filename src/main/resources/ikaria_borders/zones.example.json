@@ -1,5 +1,5 @@
 {
-  "_comment": "Ikaria Borders zones.json (v1). Формы: circle{center,radius}, square{center,half; граница снаружи}, rect{from,to; включительно}, polygon{points>=3}, union{shapes}, difference{base,minus}. Приоритет: больше побеждает. parent наследует правила. mapOnly/rules:false — только для карты. Поля _comment игнорируются.",
+  "_comment": "Ikaria Borders zones.json (v1). Формы: circle{center,radius}, square{center,half; граница снаружи}, rect{from,to; включительно}, polygon{points>=3}, union{shapes}, difference{base,minus}. Приоритет: больше побеждает. parent наследует правила. mapOnly/rules:false — только для карты. Штриховка заливки на карте = приват запрещён (дикие земли: style fill; spawn/build — только обводка). Ад и Энд — целиком дикие земли (приват запрещён, красная штриховка). Поля _comment игнорируются.",
   "version": 1,
   "global": {
     "claimCheck": "chunk_center",
@@ -12,7 +12,7 @@
       "id": "wild", "name": "Дикие земли", "dimension": "minecraft:overworld",
       "default": true, "priority": 0,
       "rules": { "pvp": true, "claims": { "allow": false, "forceload": false, "anchor": false } },
-      "map": { "show": false },
+      "map": { "show": true, "color": "#FF3030", "style": "fill", "opacity": 0.3, "label": "Дикие земли — приват запрещён" },
       "meta": { "hud": "wild" }
     },
     {
@@ -20,7 +20,7 @@
       "shape": { "type": "square", "center": [0, 0], "half": 1500 },
       "priority": 20, "parent": "wild",
       "rules": { "claims": { "allow": true, "forceload": true, "anchor": true } },
-      "map": { "show": true, "color": "#FF3030", "style": "outline", "opacity": 0.6, "label": "Граница диких земель" },
+      "map": { "show": true, "color": "#3399FF", "style": "outline", "opacity": 1, "label": "Зона застройки" },
       "meta": { "hud": "build" }
     },
     {
@@ -28,7 +28,7 @@
       "shape": { "type": "square", "center": [0, 0], "half": 100 },
       "priority": 30, "parent": "build",
       "rules": { "pvp": false },
-      "map": { "show": true, "color": "#55FF55", "style": "fill+outline", "opacity": 0.25 },
+      "map": { "show": true, "color": "#55FF55", "style": "outline", "opacity": 1 },
       "meta": { "hud": "spawn" }
     },
     {
@@ -37,7 +37,7 @@
       "priority": 5, "mapOnly": true,
       "map": { "show": true, "color": "#AA00FF", "style": "outline", "side": "inner" }
     },
-    { "id": "nether", "name": "Ад", "dimension": "minecraft:the_nether", "default": true, "priority": 0, "rules": { "pvp": true }, "meta": { "hud": "nether" }, "map": { "show": false } },
-    { "id": "end", "name": "Энд", "dimension": "minecraft:the_end", "default": true, "priority": 0, "rules": { "pvp": true }, "meta": { "hud": "end" }, "map": { "show": false } }
+    { "id": "nether", "name": "Ад", "dimension": "minecraft:the_nether", "default": true, "priority": 0, "rules": { "pvp": true, "claims": { "allow": false, "forceload": false, "anchor": false } }, "meta": { "hud": "nether" }, "map": { "show": true, "color": "#FF3030", "style": "fill", "opacity": 0.3, "label": "Дикие земли — приват запрещён" } },
+    { "id": "end", "name": "Энд", "dimension": "minecraft:the_end", "default": true, "priority": 0, "rules": { "pvp": true, "claims": { "allow": false, "forceload": false, "anchor": false } }, "meta": { "hud": "end" }, "map": { "show": true, "color": "#FF3030", "style": "fill", "opacity": 0.3, "label": "Дикие земли — приват запрещён" } }
   ]
 }
