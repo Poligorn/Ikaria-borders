@@ -85,11 +85,13 @@ public final class ZoneManager {
             for (ConfigIssue e : res.errors()) LOG.error("[ikaria_borders] ошибка конфига: {}", e);
             return new ReloadResult(false, 0, res.errors(), res.warnings());
         }
+        ZoneConfig before = current;
         current = res.config(); // atomic swap
         int n = res.config().allZones().size();
         LOG.info("[ikaria_borders] Конфиг загружен: {} зон(ы)", n);
         PlayerZoneTracker.invalidateAll();
         NeoForge.EVENT_BUS.post(new ZonesReloadedEvent(n));
+        if (announce) ClaimSweeper.onReload(before, current); // sweep only on /borders reload, not at startup
         return new ReloadResult(true, n, List.of(), res.warnings());
     }
 
