@@ -59,6 +59,7 @@ public final class ZoneMapModel {
 
     private static final class Region {
         final int[] colors = new int[5 * REGION_CHUNKS * REGION_CHUNKS];
+        final byte[] sides = new byte[REGION_CHUNKS * REGION_CHUNKS]; // ChunkHighlightRaster bits
         final MapZone[] tip = new MapZone[REGION_CHUNKS * REGION_CHUNKS];
         boolean any;
     }
@@ -130,6 +131,25 @@ public final class ZoneMapModel {
             System.arraycopy(r.colors, li * 5, out, 0, 5);
             return out;
         }
+    }
+
+    /** Fills a 16x16 BGRA raster (Xaero format) for the chunk; false if the chunk is not highlit. */
+    public boolean raster(MapTarget t, String dim, int cx, int cz, int[] out) {
+        if (!settings.active(t)) return false;
+        DimView v = dims.get(dim);
+        if (v == null) return false;
+        int rx = Math.floorDiv(cx, REGION_CHUNKS), rz = Math.floorDiv(cz, REGION_CHUNKS);
+        if (!aabbMayHit(v, rx, rz)) return false;
+        int li = (Math.floorMod(cz, REGION_CHUNKS) << 5) | Math.floorMod(cx, REGION_CHUNKS);
+        int[] c = new int[5];
+        int mask;
+        synchronized (this) {
+            Region r = region(v, dim, rx, rz);
+            if (!r.any || r.tip[li] == null) return false;
+            System.arraycopy(r.colors, li * 5, c, 0, 5);
+            mask = r.sides[li];
+        }
+        return ChunkHighlightRaster.render(c, mask, cx, cz, settings, out);
     }
 
     public boolean chunkIsHighlit(MapTarget t, String dim, int cx, int cz) {
@@ -216,6 +236,7 @@ public final class ZoneMapModel {
                 // N (-Z), E (+X), S (+Z), W (-X)
                 int[] nb = {gi - GRID, gi + 1, gi + GRID, gi - 1};
                 boolean border = false;
+                int mask = 0;
                 for (int s = 0; s < 4; s++) {
                     for (int i = 0; i < n; i++) {
                         MapZone z = v.zones[i];
@@ -225,6 +246,7 @@ public final class ZoneMapModel {
                             side[s] = argb[i];
                             if (tip == null) tip = z;
                             border = true;
+                            mask |= 1 << s;
                             break;
                         }
                     }
@@ -236,6 +258,7 @@ public final class ZoneMapModel {
                 out.colors[o + 2] = side[1];
                 out.colors[o + 3] = side[2];
                 out.colors[o + 4] = side[3];
+                out.sides[li] = (byte) mask;
                 out.tip[li] = tip;
                 out.any = true;
             }

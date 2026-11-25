@@ -38,6 +38,13 @@ public final class WorldMapZoneHighlighter extends ChunkHighlighter {
         return ClientState.MODEL.chunkIsHighlit(T, dim(dimension), chunkX, chunkZ);
     }
 
+    /** Own 16x16 BGRA raster (hatch + thick outline); Xaero's default 1px sides are not used. */
+    @Override
+    public int[] getChunkHighlitColor(ResourceKey<Level> dimension, int chunkX, int chunkZ) {
+        return ClientState.MODEL.raster(T, dim(dimension), chunkX, chunkZ, resultStore) ? resultStore : null;
+    }
+
+    /** Unused (the raster replaces the parent's getChunkHighlitColor); kept for the abstract contract. */
     @Override
     protected int[] getColors(ResourceKey<Level> dimension, int chunkX, int chunkZ) {
         return ClientState.MODEL.colors(T, dim(dimension), chunkX, chunkZ);
