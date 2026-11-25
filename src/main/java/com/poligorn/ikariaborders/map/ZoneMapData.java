@@ -28,7 +28,7 @@ public record ZoneMapData(long version, List<MapZone> zones) {
             String style = m.style() == null ? "outline" : m.style();
             out.add(new MapZone(z.id(), z.name(), z.dimension(), z.isDefault() ? null : z.shape(), z.priority(),
                     z.index(), parseRgb(m.color()), style.contains("fill"), style.contains("outline"),
-                    (float) m.opacity(), "outer".equals(m.side()), m.label()));
+                    (float) m.opacity(), "outer".equals(m.side()), m.label(), z.mapOnly()));
         }
         return ZoneMapCodec.withComputedVersion(out);
     }

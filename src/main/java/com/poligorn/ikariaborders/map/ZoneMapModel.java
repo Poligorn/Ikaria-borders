@@ -228,6 +228,7 @@ public final class ZoneMapModel {
                 MapZone tip = null;
                 for (int i = 0; i < n; i++) { // zone of the chunk: first containing, by priority
                     if (in[i] != null && in[i][gi]) {
+                        if (!v.zones[i].shadowsFill()) continue; // map-only outline (edge) does not hide the fill below it
                         if (v.zones[i].fill() && argb[i] != 0) { center = argb[i]; tip = v.zones[i]; }
                         break;
                     }

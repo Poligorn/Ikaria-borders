@@ -7,7 +7,17 @@ import com.poligorn.ikariaborders.zone.Shape;
  * {@code shape == null} means a default zone covering the whole dimension.
  */
 public record MapZone(String id, String name, String dimension, Shape shape, int priority, int order,
-                      int rgb, boolean fill, boolean outline, float opacity, boolean outer, String label) {
+                      int rgb, boolean fill, boolean outline, float opacity, boolean outer, String label, boolean mapOnly) {
+
+    public MapZone(String id, String name, String dimension, Shape shape, int priority, int order,
+                   int rgb, boolean fill, boolean outline, float opacity, boolean outer, String label) {
+        this(id, name, dimension, shape, priority, order, rgb, fill, outline, opacity, outer, label, false);
+    }
+
+    /** Map-only outline zones (e.g. world edge) only draw their own border; they never shadow a lower fill. */
+    public boolean shadowsFill() {
+        return !(mapOnly && !fill);
+    }
 
     public boolean isDefault() {
         return shape == null;

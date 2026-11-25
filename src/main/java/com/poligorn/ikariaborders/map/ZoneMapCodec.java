@@ -86,6 +86,7 @@ public final class ZoneMapCodec {
             out.writeBoolean(z.outer());
             out.writeBoolean(z.label() != null);
             if (z.label() != null) writeStr(out, z.label());
+            out.writeBoolean(z.mapOnly());
         }
     }
 
@@ -97,7 +98,8 @@ public final class ZoneMapCodec {
         float opacity = in.readFloat();
         boolean outer = in.readBoolean();
         String label = in.readBoolean() ? readStr(in) : null;
-        return new MapZone(id, name, dim, shape, priority, order, rgb, fill, outline, opacity, outer, label);
+        boolean mapOnly = in.readBoolean();
+        return new MapZone(id, name, dim, shape, priority, order, rgb, fill, outline, opacity, outer, label, mapOnly);
     }
 
     private static void writeShape(DataOutputStream out, Shape s) throws IOException {

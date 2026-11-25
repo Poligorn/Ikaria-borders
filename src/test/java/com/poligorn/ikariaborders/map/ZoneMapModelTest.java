@@ -132,14 +132,26 @@ class ZoneMapModelTest {
     }
 
     @Test
-    void fillPlusOutlineUsesDifferentSideColourFromFillOpacity() throws IOException {
-        // example config: spawn is fill+outline, green, opacity 0.25 -> centre and the border sides share one colour here,
-        // and the build outline (red 0.6) must NOT leak into spawn chunks
+    void exampleOnlyWildIsFilledSpawnAndBuildAreOutlines() throws IOException {
+        // wild = amber fill (hatched by the raster = claims forbidden); spawn green / build blue are outlines only
         ZoneMapModel m = exampleModel();
-        int[] mid = m.colors(WM, OW, 0, 0);
-        assertNotNull(mid);
-        int green25 = ((int) Math.round(0.25 * 255) << 24) | 0x55FF55;
-        assertArrayEquals(new int[]{green25, green25, green25, green25, green25}, mid);
+        int amber = ((int) Math.round(0.3 * 255) << 24) | 0xE8A020;
+        int green = 0xFF000000 | 0x55FF55, blue = 0xFF000000 | 0x3399FF;
+        // deep wild (inside the edge radius): wild fill, no build/spawn outline, and the edge zone does not hide the fill
+        assertArrayEquals(new int[]{amber, amber, amber, amber, amber}, m.colors(WM, OW, 5000 / 16, 0));
+        // inside build, not on the border: no fill (not hatched inside)
+        assertNull(m.colors(WM, OW, 200 / 16, 0));
+        // inside spawn: no fill
+        assertNull(m.colors(WM, OW, 0, 0));
+        // spawn east border (half 100: last inside chunk cx=5): green outline only, no fill
+        assertArrayEquals(new int[]{0, 0, green, 0, 0}, m.colors(WM, OW, 5, 0));
+        // build east border (last inside chunk cx=93): blue outline only
+        assertArrayEquals(new int[]{0, 0, blue, 0, 0}, m.colors(WM, OW, 93, 0));
+        // first chunk outside build: wild fill again
+        assertArrayEquals(new int[]{amber, amber, amber, amber, amber}, m.colors(WM, OW, 94, 0));
+        // tooltips
+        assertEquals("Дикие земли — приват запрещён", m.tooltip(WM, OW, 5000 / 16, 0));
+        assertEquals("Зона застройки", m.tooltip(WM, OW, 93, 0));
     }
 
     // ---- mapOnly edge + default zones ----
@@ -148,28 +160,27 @@ class ZoneMapModelTest {
     void mapOnlyEdgeIsDrawnAndInnerOutlineStaysOnItsOwnBorder() throws IOException {
         ZoneMapModel m = exampleModel();
         int purple = ((int) Math.round(0.6 * 255) << 24) | 0xAA00FF;
+        int amber = ((int) Math.round(0.3 * 255) << 24) | 0xE8A020;
         // 10000 / 16 = 625: centre 624*16+8 = 9992 < 10000 inside, 625 -> 10008 outside
         int[] e = m.colors(WM, OW, 624, 0);
         assertNotNull(e, "mapOnly edge must be drawn");
-        assertArrayEquals(new int[]{0, 0, purple, 0, 0}, e);
-        assertNull(m.colors(WM, OW, 625, 0));
-        assertArrayEquals(new int[]{0, 0, 0, 0, purple}, m.colors(WM, OW, -625, 0));
-        // between 1500 and 10000 nothing is painted (edge is outline-only, no purple line at the build border)
-        assertNull(m.colors(WM, OW, 100, 0));
-        assertNull(m.colors(WM, OW, 94, 0));
-        // build border (red) at 1500 sits on the build chunks only
-        int red = ((int) Math.round(0.6 * 255) << 24) | 0xFF3030;
-        assertArrayEquals(new int[]{0, 0, red, 0, 0}, m.colors(WM, OW, 93, 0));
+        assertArrayEquals(new int[]{amber, amber, purple, amber, amber}, e);
+        assertArrayEquals(new int[]{amber, amber, amber, amber, amber}, m.colors(WM, OW, 625, 0));
+        assertArrayEquals(new int[]{amber, amber, amber, amber, purple}, m.colors(WM, OW, -625, 0));
+        // between 1500 and 10000 only the wild fill (no purple line at the build border)
+        assertArrayEquals(new int[]{amber, amber, amber, amber, amber}, m.colors(WM, OW, 100, 0));
+        // build border (blue) at 1500 sits on the build chunks only
+        assertArrayEquals(new int[]{0, 0, 0xFF3399FF, 0, 0}, m.colors(WM, OW, 93, 0));
     }
 
     @Test
     void defaultZonesWithShowFalseNeverFillTheDimension() throws IOException {
         ZoneMapData d = ZoneMapData.of(ConfigLoader.parse(exampleJson(), null).config());
-        assertEquals(Set.of("build", "spawn", "edge"), d.zones().stream().map(MapZone::id).collect(java.util.stream.Collectors.toSet()));
+        assertEquals(Set.of("wild", "build", "spawn", "edge"), d.zones().stream().map(MapZone::id).collect(java.util.stream.Collectors.toSet()));
         ZoneMapModel m = new ZoneMapModel();
         m.setData(d);
-        assertNull(m.colors(WM, OW, 5000, 5000));
-        assertNull(m.colors(WM, "minecraft:the_nether", 0, 0));
+        assertNotNull(m.colors(WM, OW, 5000, 5000)); // wild (show:true, fill) fills the overworld
+        assertNull(m.colors(WM, "minecraft:the_nether", 0, 0)); // nether/end defaults stay show:false
         assertFalse(m.regionHasHighlights(WM, "minecraft:the_nether", 0, 0));
     }
 
@@ -325,8 +336,9 @@ class ZoneMapModelTest {
     @Test
     void borderChunkTooltipComesFromTheBorderZone() throws IOException {
         ZoneMapModel m = exampleModel();
-        assertEquals("Граница диких земель", m.tooltip(WM, OW, 93, 0)); // build label, border chunk
-        assertEquals("Спавн", m.tooltip(WM, OW, 0, 0));
-        assertEquals("Край мира", m.tooltip(WM, OW, 624, 0));
+        assertEquals("Зона застройки", m.tooltip(WM, OW, 93, 0)); // build label, border chunk
+        assertNull(m.tooltip(WM, OW, 0, 0)); // spawn centre: outline-only, nothing to show
+        assertEquals("Спавн", m.tooltip(WM, OW, 5, 0)); // spawn border chunk
+        assertEquals("Дикие земли — приват запрещён", m.tooltip(WM, OW, 624, 0)); // fill zone wins the tooltip over the edge line
     }
 }
