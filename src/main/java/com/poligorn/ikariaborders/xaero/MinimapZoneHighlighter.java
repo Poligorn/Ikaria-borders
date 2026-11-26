@@ -15,7 +15,7 @@ public final class MinimapZoneHighlighter extends ChunkHighlighter {
     private static final MapTarget T = MapTarget.MINIMAP;
 
     public MinimapZoneHighlighter() {
-        super(true);
+        super(false); // only on discovered terrain: otherwise Xaero creates/loads empty regions for the whole-dimension fill
     }
 
     private static String dim(ResourceKey<Level> d) {

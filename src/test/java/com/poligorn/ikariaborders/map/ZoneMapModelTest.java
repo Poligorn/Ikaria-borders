@@ -278,6 +278,8 @@ class ZoneMapModelTest {
     void regionAabbCullSkipsFarRegionsWithoutComputing() {
         ZoneMapModel m = model(sq("spawn", 100, 30, "{\"show\":true,\"style\":\"fill+outline\"}", false));
         assertTrue(m.regionHasHighlights(WM, OW, 0, 0));
+        assertEquals(0, m.computations()); // existence check never computes
+        assertNotNull(m.colors(WM, OW, 1, 1));
         int before = m.computations();
         assertEquals(1, before);
         // regions far away (and in other dimensions): false, nothing computed
@@ -304,7 +306,7 @@ class ZoneMapModelTest {
     @Test
     void regionCacheIsLru256() {
         ZoneMapModel m = model(sq("big", 1000000, 1, "{\"show\":true,\"style\":\"fill\"}", false));
-        for (int i = 0; i < 400; i++) assertTrue(m.regionHasHighlights(WM, OW, i, 0));
+        for (int i = 0; i < 400; i++) assertNotNull(m.colors(WM, OW, i * 32 + 1, 1));
         assertEquals(ZoneMapModel.MAX_REGIONS, m.cachedRegions());
     }
 
