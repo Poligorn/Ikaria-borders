@@ -22,8 +22,7 @@ public final class ClientSync {
             LOG.error("[ikaria_borders/client] Не удалось разобрать данные карты от сервера ({} байт): {}", bytes.length, e.toString());
             return;
         }
-        boolean changed = data.version() != ClientState.MODEL.dataVersion();
-        ClientState.MODEL.setData(data);
+        boolean changed = ClientState.MODEL.setData(data);
         LOG.info("[ikaria_borders/client] Получены зоны для карты: {} (версия {}{})", data.zones().size(),
                 Long.toHexString(data.version()), changed ? "" : ", без изменений");
         if (changed) XaeroCompat.requestRefresh(); // repaint already baked map regions

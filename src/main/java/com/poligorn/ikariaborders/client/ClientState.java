@@ -17,23 +17,25 @@ public final class ClientState {
         return userEnabled;
     }
 
-    public static void setUserEnabled(boolean v) {
+    /** @return true if the effective model changed (caller should refresh Xaero). */
+    public static boolean setUserEnabled(boolean v) {
         userEnabled = v;
-        apply();
+        return apply();
     }
 
-    public static void setConfigSettings(MapSettings s) {
+    /** @return true if the effective model changed. */
+    public static boolean setConfigSettings(MapSettings s) {
         fromConfig = s;
-        apply();
+        return apply();
     }
 
     /** Effective settings = config, minus the runtime toggle. */
-    private static void apply() {
-        MODEL.setSettings(fromConfig.withEnabled(fromConfig.enabled() && userEnabled));
+    private static boolean apply() {
+        return MODEL.setSettings(fromConfig.withEnabled(fromConfig.enabled() && userEnabled));
     }
 
     /** Leaving a server: forget its zones, so nothing leaks to the next server (or a vanilla one). */
-    public static void clearServerData() {
-        MODEL.setData(com.poligorn.ikariaborders.map.ZoneMapData.EMPTY);
+    public static boolean clearServerData() {
+        return MODEL.setData(com.poligorn.ikariaborders.map.ZoneMapData.EMPTY);
     }
 }

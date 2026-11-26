@@ -16,7 +16,7 @@ public final class WorldMapZoneHighlighter extends ChunkHighlighter {
     private static final MapTarget T = MapTarget.WORLD_MAP;
 
     public WorldMapZoneHighlighter() {
-        super(true); // draw outside discovered terrain too, like OPAC claims
+        super(false); // only on discovered terrain: otherwise Xaero creates/loads empty regions for the whole-dimension fill
     }
 
     private static String dim(ResourceKey<Level> d) {

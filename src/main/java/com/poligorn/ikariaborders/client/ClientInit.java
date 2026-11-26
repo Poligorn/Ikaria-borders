@@ -46,8 +46,7 @@ public final class ClientInit {
     /** Config events can fire off the main thread (file watcher): hop to the client thread before touching Xaero. */
     private static void applyConfig() {
         Minecraft.getInstance().execute(() -> {
-            ClientState.setConfigSettings(ClientConfig.snapshot());
-            XaeroCompat.requestRefresh();
+            if (ClientState.setConfigSettings(ClientConfig.snapshot())) XaeroCompat.requestRefresh();
         });
     }
 
@@ -62,15 +61,13 @@ public final class ClientInit {
         while (toggleKey.consumeClick()) toggled = !toggled;
         if (!toggled) return;
         boolean now = !ClientState.userEnabled();
-        ClientState.setUserEnabled(now);
-        XaeroCompat.requestRefresh();
+        if (ClientState.setUserEnabled(now)) XaeroCompat.requestRefresh();
         var p = Minecraft.getInstance().player;
         if (p != null) p.sendSystemMessage(Component.literal("Границы зон на карте: " + (now ? "включены" : "выключены")));
         LOG.info("[ikaria_borders/client] Границы зон на карте: {}", now ? "включены" : "выключены");
     }
 
     private static void onLogout(ClientPlayerNetworkEvent.LoggingOut e) {
-        ClientState.clearServerData();
-        XaeroCompat.requestRefresh();
+        if (ClientState.clearServerData()) XaeroCompat.requestRefresh();
     }
 }

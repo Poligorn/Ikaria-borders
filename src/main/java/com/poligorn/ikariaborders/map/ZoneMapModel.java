@@ -7,6 +7,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Client-side chunk painter (TZ §11). Pure JVM; the Xaero adapters only translate calls.
@@ -23,7 +24,7 @@ import java.util.Objects;
  *   <li>Colour layout of {@code getColors}: [0]=centre, [1]=north (-Z), [2]=east (+X), [3]=south (+Z), [4]=west (-X),
  *       derived from the bytecode of Xaero's {@code ChunkHighlighter.getChunkHighlitColor}; a side equal to the centre means "no border".</li>
  * </ul>
- * Regions of 32x32 chunks are computed once and kept in an LRU (256). Thread-safe (coarse lock).
+ * Regions of 32x32 chunks are computed once and kept in an LRU (256). Thread-safe: regions are computed outside locks, only the LRU get/put is locked; existence checks never compute.
  */
 public final class ZoneMapModel {
     public static final int REGION_CHUNKS = 32;
@@ -31,24 +32,45 @@ public final class ZoneMapModel {
     public static final int MAX_REGIONS = 256;
     private static final int GRID = REGION_CHUNKS + 2; // one chunk margin for neighbour checks
 
-    private volatile ZoneMapData data = ZoneMapData.EMPTY;
-    private volatile MapSettings settings = MapSettings.DEFAULT;
-    private volatile Map<String, DimView> dims = Map.of();
-    private int computations; // test hook
-
-    private final Map<RegionKey, Region> cache = new LinkedHashMap<>(64, 0.75f, true) {
-        @Override protected boolean removeEldestEntry(Map.Entry<RegionKey, Region> e) {
-            return size() > MAX_REGIONS;
+    /** Immutable snapshot of data+settings+views with its own region cache; replaced atomically (stale puts hit the old cache). */
+    private static final class State {
+        final ZoneMapData data;
+        final MapSettings settings;
+        final Map<String, DimView> dims;
+        final Map<RegionKey, Region> cache = new LinkedHashMap<>(64, 0.75f, true) {
+            @Override protected boolean removeEldestEntry(Map.Entry<RegionKey, Region> e) {
+                return size() > MAX_REGIONS;
+            }
+        };
+        State(ZoneMapData data, MapSettings settings, Map<String, DimView> dims) {
+            this.data = data; this.settings = settings; this.dims = dims;
         }
-    };
+        Region get(RegionKey k) { synchronized (cache) { return cache.get(k); } }
+        Region putIfAbsent(RegionKey k, Region r) {
+            synchronized (cache) {
+                Region old = cache.get(k);
+                if (old != null) return old;
+                cache.put(k, r);
+                return r;
+            }
+        }
+        int size() { synchronized (cache) { return cache.size(); } }
+    }
+
+    private volatile State state = new State(ZoneMapData.EMPTY, MapSettings.DEFAULT, Map.of());
+    private final AtomicInteger computations = new AtomicInteger(); // test hook
 
     private record RegionKey(String dim, int rx, int rz) {}
 
     private static final class DimView {
         final MapZone[] zones;     // visible, priority desc then declaration order
         final double[][] bounds;   // per zone [minX,maxX,minZ,maxZ]; null for default zones
+        final boolean defaultFill; // a visible default zone with fill covers the whole dimension
         DimView(MapZone[] zones) {
             this.zones = zones;
+            boolean df = false;
+            for (MapZone z : zones) if (z.shape() == null) df = true;
+            this.defaultFill = df;
             this.bounds = new double[zones.length][];
             for (int i = 0; i < zones.length; i++) {
                 if (zones[i].shape() != null) {
@@ -66,24 +88,31 @@ public final class ZoneMapModel {
         boolean any;
     }
 
-    public synchronized void setData(ZoneMapData d) {
-        this.data = Objects.requireNonNull(d);
-        rebuild();
+    /** @return true if the model changed (version is a content hash, so equal version = same map data). */
+    public synchronized boolean setData(ZoneMapData d) {
+        Objects.requireNonNull(d);
+        State cur = state;
+        if (d.version() == cur.data.version()) return false;
+        state = rebuild(d, cur.settings);
+        return true;
     }
 
-    public synchronized void setSettings(MapSettings s) {
-        this.settings = Objects.requireNonNull(s);
-        rebuild();
+    /** @return true if the model changed. */
+    public synchronized boolean setSettings(MapSettings s) {
+        Objects.requireNonNull(s);
+        State cur = state;
+        if (s.equals(cur.settings)) return false;
+        state = rebuild(cur.data, s);
+        return true;
     }
 
-    public MapSettings settings() { return settings; }
-    public ZoneMapData data() { return data; }
-    public long dataVersion() { return data.version(); }
-    public synchronized int computations() { return computations; }
-    public synchronized int cachedRegions() { return cache.size(); }
+    public MapSettings settings() { return state.settings; }
+    public ZoneMapData data() { return state.data; }
+    public long dataVersion() { return state.data.version(); }
+    public int computations() { return computations.get(); }
+    public int cachedRegions() { return state.size(); }
 
-    private void rebuild() {
-        cache.clear();
+    private static State rebuild(ZoneMapData data, MapSettings settings) {
         Map<String, List<MapZone>> byDim = new HashMap<>();
         for (MapZone z : data.zones()) {
             if (settings.hiddenZones().contains(z.id())) continue;
@@ -96,62 +125,64 @@ public final class ZoneMapModel {
             v.sort(cmp);
             out.put(k, new DimView(v.toArray(new MapZone[0])));
         });
-        dims = out;
+        return new State(data, settings, out);
     }
 
     public boolean active(MapTarget t) {
-        return settings.active(t);
+        return state.settings.active(t);
     }
 
     /** Value for Xaero's {@code calculateRegionHash}: changes with the config version and client settings. */
     public int regionHash(MapTarget t) {
-        return Objects.hash(data.version(), settings.hash(t));
+        State s = state;
+        return Objects.hash(s.data.version(), s.settings.hash(t));
     }
 
-    /** Cheap AABB cull first; only then (cached) per-chunk work. */
+    /**
+     * Existence check for Xaero (called for every visible leaf): never computes and never touches the LRU.
+     * Default fill zone: always true. Otherwise AABB only (may be a false positive on the 1-chunk margin;
+     * Xaero then asks {@code chunkIsHighlit} per tile).
+     */
     public boolean regionHasHighlights(MapTarget t, String dim, int rx, int rz) {
-        if (!settings.active(t)) return false;
-        DimView v = dims.get(dim);
-        if (v == null || !aabbMayHit(v, rx, rz)) return false;
-        synchronized (this) {
-            return region(v, dim, rx, rz).any;
-        }
+        State s = state;
+        if (!s.settings.active(t)) return false;
+        DimView v = s.dims.get(dim);
+        if (v == null) return false;
+        return v.defaultFill || aabbMayHit(v, rx, rz);
     }
 
     /** Colours for Xaero ({@code [centre, N, E, S, W]} as ARGB) or null if the chunk is not highlit. */
     public int[] colors(MapTarget t, String dim, int cx, int cz) {
-        if (!settings.active(t)) return null;
-        DimView v = dims.get(dim);
+        State s = state;
+        if (!s.settings.active(t)) return null;
+        DimView v = s.dims.get(dim);
         if (v == null) return null;
         int rx = Math.floorDiv(cx, REGION_CHUNKS), rz = Math.floorDiv(cz, REGION_CHUNKS);
         if (!aabbMayHit(v, rx, rz)) return null;
         int li = (Math.floorMod(cz, REGION_CHUNKS) << 5) | Math.floorMod(cx, REGION_CHUNKS);
-        synchronized (this) {
-            Region r = region(v, dim, rx, rz);
-            if (!r.any || r.tip[li] == null) return null;
-            int[] out = new int[5];
-            System.arraycopy(r.colors, li * 5, out, 0, 5);
-            return out;
-        }
+        Region r = region(s, v, dim, rx, rz);
+        if (!r.any || r.tip[li] == null) return null;
+        int[] out = new int[5];
+        System.arraycopy(r.colors, li * 5, out, 0, 5);
+        return out;
     }
 
     /** Fills a 16x16 BGRA raster (Xaero format) for the chunk; false if the chunk is not highlit. */
     public boolean raster(MapTarget t, String dim, int cx, int cz, int[] out) {
-        if (!settings.active(t)) return false;
-        DimView v = dims.get(dim);
+        State s = state;
+        if (!s.settings.active(t)) return false;
+        DimView v = s.dims.get(dim);
         if (v == null) return false;
         int rx = Math.floorDiv(cx, REGION_CHUNKS), rz = Math.floorDiv(cz, REGION_CHUNKS);
         if (!aabbMayHit(v, rx, rz)) return false;
         int li = (Math.floorMod(cz, REGION_CHUNKS) << 5) | Math.floorMod(cx, REGION_CHUNKS);
         int[] c = new int[5];
         int mask;
-        synchronized (this) {
-            Region r = region(v, dim, rx, rz);
-            if (!r.any || r.tip[li] == null) return false;
-            System.arraycopy(r.colors, li * 5, c, 0, 5);
-            mask = r.sides[li];
-        }
-        return ChunkHighlightRaster.render(c, mask, cx, cz, settings, out);
+        Region r = region(s, v, dim, rx, rz);
+        if (!r.any || r.tip[li] == null) return false;
+        System.arraycopy(r.colors, li * 5, c, 0, 5);
+        mask = r.sides[li];
+        return ChunkHighlightRaster.render(c, mask, cx, cz, s.settings, out);
     }
 
     public boolean chunkIsHighlit(MapTarget t, String dim, int cx, int cz) {
@@ -160,14 +191,13 @@ public final class ZoneMapModel {
 
     /** Tooltip zone: first (by priority) non-map-only zone containing the chunk, even without fill; else the border zone drawn on it; or null. */
     public MapZone zoneForTooltip(MapTarget t, String dim, int cx, int cz) {
-        if (!settings.active(t)) return null;
-        DimView v = dims.get(dim);
+        State s = state;
+        if (!s.settings.active(t)) return null;
+        DimView v = s.dims.get(dim);
         if (v == null) return null;
         int rx = Math.floorDiv(cx, REGION_CHUNKS), rz = Math.floorDiv(cz, REGION_CHUNKS);
         if (!aabbMayHit(v, rx, rz)) return null;
-        synchronized (this) {
-            return region(v, dim, rx, rz).tip[(Math.floorMod(cz, REGION_CHUNKS) << 5) | Math.floorMod(cx, REGION_CHUNKS)];
-        }
+        return region(s, v, dim, rx, rz).tip[(Math.floorMod(cz, REGION_CHUNKS) << 5) | Math.floorMod(cx, REGION_CHUNKS)];
     }
 
     /** Tooltip text (label, else name) or null. */
@@ -188,19 +218,17 @@ public final class ZoneMapModel {
         return false;
     }
 
-    private Region region(DimView v, String dim, int rx, int rz) {
+    /** Compute outside any lock; if two threads race on one key, the first stored region wins. */
+    private Region region(State s, DimView v, String dim, int rx, int rz) {
         RegionKey key = new RegionKey(dim, rx, rz);
-        Region r = cache.get(key);
-        if (r == null) {
-            r = compute(v, rx, rz);
-            cache.put(key, r);
-        }
-        return r;
+        Region r = s.get(key);
+        if (r != null) return r;
+        return s.putIfAbsent(key, compute(s, v, rx, rz));
     }
 
-    private Region compute(DimView v, int rx, int rz) {
-        computations++;
-        double mult = settings.opacityMultiplier();
+    private Region compute(State st, DimView v, int rx, int rz) {
+        computations.incrementAndGet();
+        double mult = st.settings.opacityMultiplier();
         int n = v.zones.length;
         int baseX = rx * REGION_CHUNKS - 1, baseZ = rz * REGION_CHUNKS - 1;
         double rMinX = rx * REGION_BLOCKS - 16, rMaxX = rx * REGION_BLOCKS + REGION_BLOCKS + 16;
